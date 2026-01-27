@@ -179,8 +179,16 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 # ---------- FINGERPRINT (SIMULATED) ----------
 @app.post("/fingerprint")
 def fingerprint(data: FingerprintRequest, token: dict = Depends(verify_token), db: Session = Depends(get_db)):
-    # Get user from token
-    user_id = int(token.get("user_id"))
+    # Get and validate user_id from token
+    user_id_str = token.get("user_id")
+    if not user_id_str:
+        raise HTTPException(status_code=401, detail="Invalid or missing user_id in token")
+    
+    try:
+        user_id = int(user_id_str)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid user_id format in token")
+    
     user = db.query(User).filter(User.id == user_id).first()
     
     if not user:
