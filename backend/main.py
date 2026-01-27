@@ -178,25 +178,27 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 
 # ---------- FINGERPRINT (SIMULATED) ----------
 @app.post("/fingerprint")
-def fingerprint(data: FingerprintRequest, token: str = Depends(verify_token), db: Session = Depends(get_db)):
-    # Verify token matches the requested email
-    if token.get("email") != data.email:
-        raise HTTPException(status_code=403, detail="Token does not match requested email")
+def fingerprint(data: FingerprintRequest, token: dict = Depends(verify_token), db: Session = Depends(get_db)):
+    # Get user from token
+    user_id = int(token.get("user_id"))
+    user = db.query(User).filter(User.id == user_id).first()
     
-    # Verify user exists
-    user = db.query(User).filter(User.email == data.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # Verify token's user matches requested email (optional extra security check)
+    if user.email != data.email:
+        raise HTTPException(status_code=403, detail="Token does not match requested email")
+    
     session_id = str(uuid.uuid4())
     
-    # Delete any existing sessions for this email to prevent duplicates
-    db.query(DBSession).filter(DBSession.email == data.email).delete()
+    # Delete any existing sessions for this user to prevent duplicates
+    db.query(DBSession).filter(DBSession.user_id == user_id).delete()
     
     # Insert new session
     new_session = DBSession(
         session_id=session_id,
-        email=data.email,
+        user_id=user_id,
         created_at=datetime.now(timezone.utc)
     )
     

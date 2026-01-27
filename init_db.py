@@ -1,9 +1,15 @@
 """Initialize database with fresh schema and test user"""
 import os
 import sys
+import argparse
 from backend.database import SessionLocal, engine
 from backend.models import Base, User
 from backend.security import hash_password
+
+# Parse command line arguments
+parser = argparse.ArgumentParser(description="Initialize database with fresh schema and test user")
+parser.add_argument("-f", "--force", action="store_true", help="Force deletion without confirmation prompt")
+args = parser.parse_args()
 
 # Delete old database if exists (with confirmation)
 db_path = "auth.db"
@@ -13,13 +19,18 @@ if os.path.exists(db_path):
         print("❌ Cannot delete database in production environment")
         sys.exit(1)
     
-    # Require confirmation for database deletion
-    print(f"⚠️  WARNING: This will delete the existing database: {db_path}")
-    confirmation = input("Type 'DELETE' to confirm: ").strip()
-    
-    if confirmation != "DELETE":
-        print("❌ Database deletion cancelled")
-        sys.exit(0)
+    # Require confirmation for database deletion (unless --force or non-TTY)
+    if not args.force and sys.stdin.isatty():
+        print(f"⚠️  WARNING: This will delete the existing database: {db_path}")
+        confirmation = input("Type 'DELETE' to confirm: ").strip()
+        
+        if confirmation != "DELETE":
+            print("❌ Database deletion cancelled")
+            sys.exit(0)
+    elif not args.force:
+        # Non-interactive environment without --force flag
+        print("❌ Use --force flag to delete database in non-interactive mode")
+        sys.exit(1)
     
     os.remove(db_path)
     print(f"✅ Removed old database: {db_path}")

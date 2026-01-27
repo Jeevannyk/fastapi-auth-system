@@ -264,7 +264,25 @@ python init_db.py          # Reset database with test user
 2. **JWT Tokens**
    - HS256 algorithm
    - 30-minute expiry
-   - **Recommendation**: Use HttpOnly cookies for improved XSS protection (current implementation uses localStorage)
+   - **⚠️ Security Notice**: Current implementation uses localStorage which is vulnerable to XSS attacks
+   
+   **Recommended Migration to HttpOnly Cookies:**
+   - Set JWT in `Set-Cookie` header with `HttpOnly`, `Secure`, and `SameSite=Strict` flags
+   - Browser automatically includes cookie in requests (no JavaScript access)
+   - Prevents token theft via XSS exploits
+   
+   **If localStorage Must Be Retained:**
+   - Implement Content Security Policy (CSP) headers to prevent inline scripts
+   - Use input sanitization (DOMPurify) for all user-generated content
+   - Add CSRF protection tokens for state-changing operations
+   - Consider short token expiry (5-15 minutes) with refresh tokens
+   - Enable SameSite cookie attribute on session cookies
+   
+   **Trade-offs:**
+   - HttpOnly cookies: Better XSS protection but requires CSRF tokens
+   - localStorage: Easier cross-domain support but vulnerable to XSS
+   
+   *(Implementation code for HttpOnly cookie-based JWT handling available upon request)*
 
 3. **Session Management**
    - UUID-based session IDs
