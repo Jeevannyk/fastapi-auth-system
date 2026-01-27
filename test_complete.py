@@ -112,7 +112,7 @@ def test_login_invalid():
         print(f"❌ Failed: {e}")
         return False
 
-def test_fingerprint():
+def test_fingerprint(access_token=None):
     """Test fingerprint endpoint"""
     print("\n" + "="*60)
     print("TEST 5: Fingerprint/Session Creation")
@@ -122,8 +122,12 @@ def test_fingerprint():
         "email": "test@example.com"
     }
     
+    headers = {}
+    if access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
+    
     try:
-        response = requests.post(f"{BASE_URL}/fingerprint", json=data, timeout=5)
+        response = requests.post(f"{BASE_URL}/fingerprint", json=data, headers=headers, timeout=5)
         print(f"Status: {response.status_code}")
         result = response.json()
         print(f"Response: {json.dumps(result, indent=2)}")
@@ -269,7 +273,7 @@ def main():
     
     results["login_invalid"] = test_login_invalid()
     
-    session_id = test_fingerprint()
+    session_id = test_fingerprint(token)
     results["fingerprint"] = session_id is not None
     
     if session_id:
