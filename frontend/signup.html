@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cybersecurity Sign-Up</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Noto+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#135bec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"],
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                    backgroundImage: {
+                        'cyber-grid': "linear-gradient(rgba(19, 91, 236, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(19, 91, 236, 0.1) 1px, transparent 1px)"
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar for cyber feel */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #101622;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #232f48;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #135bec;
+        }
+        
+        .glass-panel {
+            background: rgba(16, 22, 34, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(35, 47, 72, 0.5);
+            box-shadow: 0 0 40px rgba(19, 91, 236, 0.1);
+        }
+
+        .input-glow:focus-within {
+            box-shadow: 0 0 15px rgba(19, 91, 236, 0.3);
+            border-color: #135bec;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display overflow-x-hidden min-h-screen flex flex-col">
+<!-- Background Layer -->
+<div class="fixed inset-0 z-0 pointer-events-none">
+<!-- Abstract glowing orbs -->
+<div class="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/20 blur-[120px]"></div>
+<div class="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-purple-900/20 blur-[120px]"></div>
+<!-- Cyber Grid Overlay -->
+<div class="absolute inset-0 bg-cyber-grid bg-[length:40px_40px] opacity-20"></div>
+<!-- Vignette -->
+<div class="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#101622_100%)]"></div>
+</div>
+<!-- Header / Nav -->
+<header class="relative z-10 flex items-center justify-between px-6 py-4 lg:px-10 border-b border-[#232f48]/50 bg-[#111722]/80 backdrop-blur-sm">
+<div class="flex items-center gap-3 text-white">
+<div class="size-8 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-3xl">shield_lock</span>
+</div>
+<h2 class="text-xl font-bold tracking-tight text-white">CyberGuard</h2>
+</div>
+<!-- Status Chip -->
+<div class="hidden sm:flex items-center gap-2 rounded-full bg-[#232f48]/50 px-3 py-1 border border-[#135bec]/30">
+<span class="material-symbols-outlined text-primary text-[18px]">lock</span>
+<span class="text-xs font-medium text-white tracking-wider">ENCRYPTED CHANNEL</span>
+</div>
+</header>
+<!-- Main Content -->
+<main class="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-8">
+<div class="w-full max-w-[520px] glass-panel rounded-xl overflow-hidden">
+<!-- Card Header -->
+<div class="bg-[#192233]/50 p-8 pb-4 text-center border-b border-[#232f48]">
+<div class="inline-flex items-center justify-center size-12 rounded-full bg-primary/10 mb-4 ring-1 ring-primary/40">
+<span class="material-symbols-outlined text-primary text-2xl">person_add</span>
+</div>
+<h1 class="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-2">INITIALIZE ACCESS</h1>
+<p class="text-slate-400 text-sm">Create your operative identity to proceed.</p>
+</div>
+<!-- Form Section -->
+<div class="p-8 pt-6 space-y-6">
+<!-- Full Name -->
+<div class="group input-glow rounded-lg transition-all duration-300">
+<label class="block">
+<div class="flex items-center justify-between mb-2">
+<span class="text-xs font-bold text-slate-300 tracking-wider uppercase">Identity</span>
+</div>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500">
+<span class="material-symbols-outlined text-[20px]">badge</span>
+</div>
+<input id="fullName" autocomplete="name" class="w-full bg-[#101622] border border-[#324467] text-white text-base rounded-lg focus:ring-0 focus:border-primary block w-full pl-11 p-3.5 placeholder:text-slate-600 font-normal transition-colors" placeholder="Full Name" type="text"/>
+</div>
+</label>
+</div>
+<!-- Email -->
+<div class="group input-glow rounded-lg transition-all duration-300">
+<label class="block">
+<div class="flex items-center justify-between mb-2">
+<span class="text-xs font-bold text-slate-300 tracking-wider uppercase">Comms Channel</span>
+</div>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500">
+<span class="material-symbols-outlined text-[20px]">alternate_email</span>
+</div>
+<input id="email" autocomplete="email" class="w-full bg-[#101622] border border-[#324467] text-white text-base rounded-lg focus:ring-0 focus:border-primary block w-full pl-11 p-3.5 placeholder:text-slate-600 font-normal transition-colors" placeholder="operative@domain.secure" type="email"/>
+</div>
+</label>
+</div>
+<!-- Password Row -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Password -->
+<div class="group input-glow rounded-lg transition-all duration-300">
+<label class="block">
+<div class="flex items-center justify-between mb-2">
+<span class="text-xs font-bold text-slate-300 tracking-wider uppercase">Access Key</span>
+</div>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500">
+<span class="material-symbols-outlined text-[20px]">key</span>
+</div>
+<input id="accessKey" class="w-full bg-[#101622] border border-[#324467] text-white text-base rounded-lg focus:ring-0 focus:border-primary block w-full pl-11 pr-10 p-3.5 placeholder:text-slate-600 font-normal transition-colors" placeholder="Access Key" type="password"/>
+<button class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-white transition-colors cursor-pointer" type="button">
+<span class="material-symbols-outlined text-[20px]">visibility</span>
+</button>
+</div>
+</label>
+</div>
+<!-- Confirm Password -->
+<div class="group input-glow rounded-lg transition-all duration-300">
+<label class="block">
+<div class="flex items-center justify-between mb-2">
+<span class="text-xs font-bold text-slate-300 tracking-wider uppercase">Verify Key</span>
+</div>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500">
+<span class="material-symbols-outlined text-[20px]">lock_reset</span>
+</div>
+<input id="verifyKey" class="w-full bg-[#101622] border border-[#324467] text-white text-base rounded-lg focus:ring-0 focus:border-primary block w-full pl-11 p-3.5 placeholder:text-slate-600 font-normal transition-colors" placeholder="Verify Key" type="password"/>
+</div>
+</label>
+</div>
+</div>
+<!-- Password Strength Indicator (Simulated) -->
+<div class="flex gap-1 h-1 w-full mt-[-10px]">
+<div class="h-full w-1/4 bg-primary rounded-full"></div>
+<div class="h-full w-1/4 bg-primary/30 rounded-full"></div>
+<div class="h-full w-1/4 bg-[#232f48] rounded-full"></div>
+<div class="h-full w-1/4 bg-[#232f48] rounded-full"></div>
+</div>
+<!-- Terms Checkbox -->
+<div class="flex items-start gap-3 pt-2">
+<div class="flex items-center h-5">
+<input class="w-4 h-4 border border-[#324467] rounded bg-[#101622] focus:ring-1 focus:ring-primary focus:ring-offset-0 text-primary cursor-pointer" id="terms" type="checkbox"/>
+</div>
+<label class="text-sm font-medium text-slate-400 cursor-pointer select-none" for="terms">
+                        I accept the <a class="text-primary hover:text-blue-400 underline decoration-1 underline-offset-4" href="#">Security Protocols</a> and Data Retention Policy.
+                    </label>
+</div>
+<!-- Submit Action -->
+<button id="signupBtn" class="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-primary hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#111722] focus:ring-primary transition-all duration-200 overflow-hidden shadow-[0_0_20px_rgba(19,91,236,0.3)] hover:shadow-[0_0_30px_rgba(19,91,236,0.5)]" type="button">
+<span class="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-colors"></span>
+<span class="relative flex items-center gap-2 tracking-widest uppercase">
+                        Establish Connection
+                        <span class="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</span>
+</button>
+<!-- Footer Link -->
+<div class="text-center pt-2">
+<p class="text-sm text-slate-400">
+                        Existing operative? 
+                        <a class="font-bold text-white hover:text-primary transition-colors ml-1 inline-flex items-center gap-1 group" href="/">
+                            Log In
+                            <span class="material-symbols-outlined text-[16px] group-hover:rotate-45 transition-transform">north_east</span>
+</a>
+</p>
+</div>
+                    
+                    <!-- Alternate Signup Form (ChatGPT Request) -->
+                    
+</div>
+<!-- Decorative Bottom Bar -->
+<div class="h-1 w-full bg-gradient-to-r from-transparent via-primary to-transparent opacity-50"></div>
+</div>
+</main>
+<!-- Footer Stats / Details -->
+<footer class="relative z-10 py-6 px-10 border-t border-[#232f48]/50 bg-[#111722]/80 backdrop-blur-sm text-center sm:text-left">
+<div class="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-500 uppercase tracking-widest font-medium">
+<div class="flex gap-6">
+<span class="flex items-center gap-1">
+<span class="size-2 rounded-full bg-green-500 animate-pulse"></span>
+                    System Status: Normal
+                </span>
+<span class="hidden sm:inline">V.4.0.2</span>
+</div>
+<div class="flex gap-4">
+<a class="hover:text-primary transition-colors" href="#">Privacy</a>
+<a class="hover:text-primary transition-colors" href="#">Support</a>
+</div>
+</div>
+</footer>
+<script src="/static/signup.js"></script>
+</body></html>
