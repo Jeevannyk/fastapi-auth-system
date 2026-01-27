@@ -1,10 +1,18 @@
 import bcrypt
 import pyotp
-from jose import jwt
+from jose import jwt, JWTError
 from datetime import datetime, timedelta
+from fastapi import HTTPException, Header
 import os
 
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-use-env-variable")
+# Fail fast if SECRET_KEY is not set (allow fallback only in development)
+if "SECRET_KEY" not in os.environ:
+    if os.getenv("ENVIRONMENT") != "development":
+        raise RuntimeError("SECRET_KEY environment variable must be set for production")
+    SECRET_KEY = "your-secret-key-change-in-production-use-env-variable"
+else:
+    SECRET_KEY = os.environ["SECRET_KEY"]
+
 ALGO = "HS256"
 
 def hash_password(password: str) -> str:
@@ -38,3 +46,29 @@ def create_token(user_id):
 
 def verify_otp(secret, otp):
     return pyotp.TOTP(secret).verify(otp)
+
+def verify_token(authorization: str = Header(None)):
+    """Verify JWT token from Authorization header"""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header missing")
+    
+    try:
+        # Extract token from "Bearer <token>" format
+        if not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Invalid authorization format")
+        
+        token = authorization.split(" ")[1]
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGO])
+        
+        # Get user info from token
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        
+        # Return user info
+        return {"user_id": user_id, "email": payload.get("email")}
+    
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    except IndexError:
+        raise HTTPException(status_code=401, detail="Invalid authorization format")

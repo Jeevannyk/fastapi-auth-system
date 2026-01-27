@@ -264,7 +264,7 @@ python init_db.py          # Reset database with test user
 2. **JWT Tokens**
    - HS256 algorithm
    - 30-minute expiry
-   - Stored in localStorage (frontend)
+   - **Recommendation**: Use HttpOnly cookies for improved XSS protection (current implementation uses localStorage)
 
 3. **Session Management**
    - UUID-based session IDs
@@ -361,15 +361,7 @@ Access at:
 - **Frontend**: http://127.0.0.1:8000
 - **API Docs**: http://127.0.0.1:8000/docs
 
-## 🔒 Authentication Flow
-
-1. **Signup** → POST `/signup` - Create account
-2. **Login** → POST `/login` - Get JWT token
-3. **Fingerprint** → POST `/fingerprint` - Biometric verification (simulated)
-4. **QR Code** → GET `/qr-image/{session_id}` - Device pairing
-5. **Dashboard** → `/home` - Authenticated access
-
-## 🗄️ Database Models
+## �️ Utility Scripts
 
 ### User
 - `id`, `full_name`, `email` (unique), `password_hash`, `created_at`

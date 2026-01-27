@@ -200,10 +200,17 @@ def test_uuid_validation():
     for pattern in malicious_patterns:
         try:
             response = requests.get(f"{BASE_URL}/qr-image/{pattern}", timeout=5)
-            result = response.json()
             
-            if response.status_code == 400 and "Invalid session ID" in result.get("detail", ""):
-                print(f"  ✅ Blocked: {pattern[:30]}...")
+            # Check status code first before attempting JSON parsing
+            if response.status_code == 400:
+                try:
+                    result = response.json()
+                    if "Invalid session ID" in result.get("detail", ""):
+                        print(f"  ✅ Blocked: {pattern[:30]}...")
+                    else:
+                        print(f"  ⚠️  Unexpected 400 response for {pattern[:30]}...")
+                except:
+                    print(f"  ✅ Blocked (400): {pattern[:30]}...")
             elif response.status_code == 404:
                 print(f"  ✅ Safe (404): {pattern[:30]}... - Not found in routing")
             else:

@@ -32,7 +32,7 @@ function openFingerprint(email) {
 
             if (!res.ok) {
                 const errorData = await res.json();
-                throw new Error(errorData.detail || "Fingerprint verification failed");
+                throw new Error(errorMessage);
             }
 
             const data = await res.json();

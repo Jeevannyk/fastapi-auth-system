@@ -7,12 +7,18 @@ document.addEventListener('DOMContentLoaded', function () {
     let errorContainer = document.getElementById('error-message');
 
     // Create error container if it doesn't exist
-    if (!errorContainer) {
+    if (!errorContainer && loginForm) {
         errorContainer = document.createElement('div');
         errorContainer.id = 'error-message';
         errorContainer.className = 'mt-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-400 text-sm text-center';
         errorContainer.style.display = 'none';
         loginForm.appendChild(errorContainer);
+    }
+    
+    // Guard: ensure form exists before proceeding
+    if (!loginForm) {
+        console.error('Login form not found');
+        return;
     }
 
     // Add event listener to form submit button
