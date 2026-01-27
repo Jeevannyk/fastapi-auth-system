@@ -65,8 +65,8 @@ def verify_token(authorization: str = Header(None)):
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token payload")
         
-        # Return user info
-        return {"user_id": user_id, "email": payload.get("email")}
+        # Return user info (only what's actually in the token)
+        return {"user_id": user_id}
     
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")

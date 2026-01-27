@@ -21,7 +21,7 @@ class Session(Base):
     __tablename__ = "sessions"
     
     session_id = Column(String, primary_key=True)
-    email = Column(String, ForeignKey("users.email"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=30))
     
