@@ -4,17 +4,25 @@ document.addEventListener('DOMContentLoaded', function () {
     const emailInput = document.querySelector('input[type="text"]');
     const passwordInput = document.querySelector('input[type="password"]');
     const submitButton = document.querySelector('button[type="button"]');
-    const errorContainer = document.getElementById('error-message');
+    let errorContainer = document.getElementById('error-message');
+
+    // Create error container if it doesn't exist
+    if (!errorContainer) {
+        errorContainer = document.createElement('div');
+        errorContainer.id = 'error-message';
+        errorContainer.className = 'mt-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-400 text-sm text-center';
+        errorContainer.style.display = 'none';
+        loginForm.appendChild(errorContainer);
+    }
 
     // Add event listener to form submit button
     submitButton.addEventListener('click', async function (e) {
         e.preventDefault();
 
         // Clear previous errors
-        if (errorContainer) {
-            errorContainer.textContent = '';
-            errorContainer.style.display = 'none';
-        }
+        errorContainer.textContent = '';
+        errorContainer.style.display = 'none';
+        errorContainer.className = 'mt-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-400 text-sm text-center';
 
         // Get input values
         const email = emailInput.value.trim();
@@ -47,7 +55,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const data = await response.json();
 
             if (response.ok) {
-                // Login successful - check next step
+                // Login successful - store token and check next step
+                if (data.access_token) {
+                    localStorage.setItem('access_token', data.access_token);
+                    localStorage.setItem('user_email', email);
+                }
+                
                 if (data.next === "fingerprint") {
                     showSuccess('Credentials verified! Proceeding to biometric...');
                     setTimeout(() => {
@@ -56,6 +69,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     // Fallback if no next step specified
                     showSuccess('Login successful!');
+                    setTimeout(() => {
+                        window.location.href = '/home';
+                    }, 1000);
                 }
 
             } else {
@@ -74,32 +90,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Helper function to show error messages
     function showError(message) {
-        if (errorContainer) {
-            errorContainer.textContent = message;
-            errorContainer.style.display = 'block';
-        } else {
-            // Create error container if it doesn't exist
-            const error = document.createElement('div');
-            error.id = 'error-message';
-            error.className = 'mt-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-400 text-sm text-center';
-            error.textContent = message;
-            loginForm.appendChild(error);
-        }
+        errorContainer.textContent = message;
+        errorContainer.className = 'mt-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-400 text-sm text-center';
+        errorContainer.style.display = 'block';
     }
 
     // Helper function to show success messages
     function showSuccess(message) {
-        if (errorContainer) {
-            errorContainer.textContent = message;
-            errorContainer.className = 'mt-4 p-3 bg-green-500/10 border border-green-500 rounded-lg text-green-400 text-sm text-center';
-            errorContainer.style.display = 'block';
-        } else {
-            const success = document.createElement('div');
-            success.id = 'error-message';
-            success.className = 'mt-4 p-3 bg-green-500/10 border border-green-500 rounded-lg text-green-400 text-sm text-center';
-            success.textContent = message;
-            loginForm.appendChild(success);
-        }
+        errorContainer.textContent = message;
+        errorContainer.className = 'mt-4 p-3 bg-green-500/10 border border-green-500 rounded-lg text-green-400 text-sm text-center';
+        errorContainer.style.display = 'block';
     }
 
     // Allow Enter key to submit form
@@ -116,19 +116,21 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Password visibility toggle
-    const togglePassword = document.querySelector('button[type="button"]:not([class*="bg-primary"])');
-    if (togglePassword) {
-        togglePassword.addEventListener('click', function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const icon = this.querySelector('.material-symbols-outlined');
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                icon.textContent = 'visibility';
-            } else {
-                passwordInput.type = 'password';
-                icon.textContent = 'visibility_off';
-            }
-        });
-    }
+    const allButtons = document.querySelectorAll('button[type="button"]');
+    allButtons.forEach(button => {
+        const icon = button.querySelector('.material-symbols-outlined');
+        if (icon && (icon.textContent === 'visibility_off' || icon.textContent === 'visibility')) {
+            button.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    icon.textContent = 'visibility';
+                } else {
+                    passwordInput.type = 'password';
+                    icon.textContent = 'visibility_off';
+                }
+            });
+        }
+    });
 });

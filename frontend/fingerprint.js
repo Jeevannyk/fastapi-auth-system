@@ -1,15 +1,28 @@
 function openFingerprint(email) {
     const modal = document.getElementById("fingerprintModal");
+    if (!modal) {
+        console.error("Fingerprint modal not found");
+        alert("Configuration error: Modal not found");
+        return;
+    }
     modal.classList.remove("hidden");
 
     document.getElementById("fingerprintBtn").onclick = async () => {
         try {
-            await navigator.credentials.get({
-                publicKey: {
-                    challenge: new Uint8Array(32),
-                    userVerification: "required"
+            // Try to use WebAuthn if available, but don't require it
+            if (navigator.credentials && navigator.credentials.get) {
+                try {
+                    await navigator.credentials.get({
+                        publicKey: {
+                            challenge: new Uint8Array(32),
+                            userVerification: "preferred"
+                        }
+                    });
+                } catch (authError) {
+                    // WebAuthn not available or failed, continue anyway
+                    console.log("WebAuthn not available, continuing...");
                 }
-            });
+            }
 
             const res = await fetch("http://127.0.0.1:8000/fingerprint", {
                 method: "POST",
@@ -17,13 +30,19 @@ function openFingerprint(email) {
                 body: JSON.stringify({ email })
             });
 
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.detail || "Fingerprint verification failed");
+            }
+
             const data = await res.json();
 
             modal.classList.add("hidden");
             showQR(data.session_id);
 
-        } catch {
-            alert("Fingerprint verification failed");
+        } catch (error) {
+            console.error("Fingerprint verification error:", error);
+            alert(error.message || "Fingerprint verification failed");
         }
     };
 }
@@ -43,9 +62,9 @@ function showQR(sessionId) {
         </div>
         <h2 class="text-2xl font-bold text-white mb-2">Scan QR Code</h2>
         <p class="text-slate-400 text-sm mb-6">Scan this code with your device to complete authentication</p>
-        <img id="qrImage" class="mx-auto mb-4 rounded-lg border-2 border-primary/30" alt="QR Code" />
-        <button onclick="document.getElementById('qrModal').remove()" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-[#232f48] hover:bg-[#2c3b5a] focus:outline-none focus:ring-2 focus:ring-primary transition-all">
-          Close
+        <img id="qrImage" class="mx-auto mb-4 rounded-lg border-2 border-primary/30" alt="QR Code" onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Crect fill=\'%23232f48\' width=\'200\' height=\'200\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%23fff\'%3EQR Failed%3C/text%3E%3C/svg%3E';" />
+        <button onclick="closeQRAndRedirect()" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-primary hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-primary transition-all">
+          Continue to Dashboard
         </button>
       </div>
     `;
@@ -54,4 +73,13 @@ function showQR(sessionId) {
 
     const qrImage = document.getElementById("qrImage");
     qrImage.src = `http://127.0.0.1:8000/qr-image/${sessionId}`;
+}
+
+function closeQRAndRedirect() {
+    const qrModal = document.getElementById("qrModal");
+    if (qrModal) {
+        qrModal.remove();
+    }
+    // Redirect to home page
+    window.location.href = '/home';
 }
