@@ -8,11 +8,16 @@ import uuid
 import qrcode
 import os
 import re
+import sys
+import logging
 from datetime import datetime, timedelta, timezone
 from .database import get_db, init_db, SessionLocal
 from .models import User, Session as DBSession
-from .security import hash_password, verify_password, create_token
+from .security import hash_password, verify_password, create_token, verify_token
 
+# Configure logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Antigravity Secure Access")
 
@@ -24,7 +29,7 @@ app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 # -------------------- CORS --------------------
 # Restrict CORS in production - use specific origins
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",")
+ALLOWED_ORIGINS = [origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -37,7 +42,8 @@ app.add_middleware(
 try:
     init_db()
 except Exception as e:
-    print(f"Warning: Database initialization failed: {e}")
+    logger.error(f"Database initialization failed: {e}", exc_info=True)
+    sys.exit(1)
 
 # -------------------- MODELS --------------------
 class SignupRequest(BaseModel):
@@ -144,7 +150,8 @@ def signup(data: SignupRequest, db: Session = Depends(get_db)):
         db.refresh(new_user)
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to create user: {str(e)}")
+        logger.exception("Failed to create user")
+        raise HTTPException(status_code=500, detail="Failed to create user")
 
     return {
         "message": "Access initialized",
@@ -171,7 +178,11 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 
 # ---------- FINGERPRINT (SIMULATED) ----------
 @app.post("/fingerprint")
-def fingerprint(data: FingerprintRequest, db: Session = Depends(get_db)):
+def fingerprint(data: FingerprintRequest, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    # Verify token matches the requested email
+    if token.get("email") != data.email:
+        raise HTTPException(status_code=403, detail="Token does not match requested email")
+    
     # Verify user exists
     user = db.query(User).filter(User.email == data.email).first()
     if not user:
@@ -194,7 +205,8 @@ def fingerprint(data: FingerprintRequest, db: Session = Depends(get_db)):
         db.commit()
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to create session: {str(e)}")
+        logger.exception("Failed to create session")
+        raise HTTPException(status_code=500, detail="Failed to create session")
     
     # Cleanup old QR files
     cleanup_old_qrs()

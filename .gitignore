@@ -144,9 +144,9 @@ test_v2.db
 # ==================== Generated Files ====================
 # QR code images
 qrs/
-*.png
-*.jpg
-*.jpeg
+qrs/*.png
+qrs/*.jpg
+qrs/*.jpeg
 
 # Logs
 *.log
