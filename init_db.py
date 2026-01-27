@@ -1,11 +1,11 @@
 """Initialize database with fresh schema and test user"""
 import os
-from backend.database import SessionLocal, Base, engine
-from backend.models import User
+from backend.database import SessionLocal, engine
+from backend.models import Base, User
 from backend.security import hash_password
 
 # Delete old database if exists
-db_path = "test_v2.db"
+db_path = "auth.db"
 if os.path.exists(db_path):
     os.remove(db_path)
     print(f"✅ Removed old database: {db_path}")
@@ -21,10 +21,9 @@ db = SessionLocal()
 
 try:
     test_user = User(
-        username="testuser",
+        full_name="Test User",
         email="test@example.com",
-        password=hash_password("password123"),
-        mfa_enabled=False
+        password_hash=hash_password("password123")
     )
     
     db.add(test_user)
@@ -35,9 +34,9 @@ try:
     print("\n" + "="*50)
     print("LOGIN CREDENTIALS")
     print("="*50)
-    print(f"  URL:      http://127.0.0.1:8000")
-    print(f"  Username: testuser")
-    print(f"  Password: password123")
+    print(f"  URL:       http://127.0.0.1:8000")
+    print(f"  Email:     test@example.com")
+    print(f"  Access Key: password123")
     print("="*50)
     
 except Exception as e:

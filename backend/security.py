@@ -1,25 +1,33 @@
-from passlib.context import CryptContext
+import bcrypt
 import pyotp
 from jose import jwt
 from datetime import datetime, timedelta
+import os
 
-pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-SECRET_KEY = "secret"
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-use-env-variable")
 ALGO = "HS256"
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt"""
     if not password:
         raise ValueError("Password cannot be empty")
-    # Ensure password is a string and encode properly
-    return pwd.hash(str(password))
+    # Ensure password is a string and encode to bytes
+    password_bytes = str(password).encode('utf-8')
+    # Hash the password with bcrypt
+    salt = bcrypt.gensalt(rounds=12)
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
 
 def verify_password(password: str, hashed_password: str) -> bool:
     """Verify a password against a hashed password"""
     if not password or not hashed_password:
         return False
-    return pwd.verify(str(password), hashed_password)
+    try:
+        password_bytes = str(password).encode('utf-8')
+        hashed_bytes = hashed_password.encode('utf-8')
+        return bcrypt.checkpw(password_bytes, hashed_bytes)
+    except Exception:
+        return False
 
 def create_token(user_id):
     payload = {
