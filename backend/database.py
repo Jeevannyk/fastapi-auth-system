@@ -1,34 +1,22 @@
-import sqlite3
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
-DB_NAME = "antigravity.db"
+DB_NAME = "auth.db"
+DATABASE_URL = f"sqlite:///./{DB_NAME}"
+
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():
-    return sqlite3.connect(DB_NAME, check_same_thread=False)
+    """Dependency for FastAPI routes"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 def init_db():
-    db = get_db()
-    cur = db.cursor()
-
-    # USERS TABLE
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        full_name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-
-    # SESSIONS TABLE (QR / device pairing)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS sessions (
-        session_id TEXT PRIMARY KEY,
-        email TEXT NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-
-    db.commit()
-    db.close()
+    """Initialize database tables"""
+    from .models import Base
+    Base.metadata.create_all(bind=engine)

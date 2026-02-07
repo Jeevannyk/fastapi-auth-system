@@ -1,6 +1,6 @@
 """Quick database check script"""
-from backend.database import SessionLocal, Base, engine
-from backend.models import User
+from backend.database import SessionLocal, engine
+from backend.models import Base, User
 
 # Ensure tables exist
 Base.metadata.create_all(bind=engine)
@@ -13,7 +13,7 @@ print(f"\nTotal users in database: {len(users)}\n")
 
 if users:
     for user in users:
-        print(f"  - Username: {user.username}")
+        print(f"  - Name: {user.full_name}")
         print(f"    Email: {user.email}")
         print(f"    ID: {user.id}")
         print()
