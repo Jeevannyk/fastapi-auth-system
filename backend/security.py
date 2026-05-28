@@ -1,74 +1,96 @@
-import bcrypt
-import pyotp
-from jose import jwt, JWTError
-from datetime import datetime, timedelta
-from fastapi import HTTPException, Header
-import os
+import base64
+import hashlib
+import hmac
+import io
+import secrets
+import time
+from datetime import datetime, timedelta, timezone
+from typing import Literal
 
-# Fail fast if SECRET_KEY is not set (allow fallback only in development)
-if "SECRET_KEY" not in os.environ:
-    if os.getenv("ENVIRONMENT") != "development":
-        raise RuntimeError("SECRET_KEY environment variable must be set for production")
-    SECRET_KEY = "your-secret-key-change-in-production-use-env-variable"
-else:
-    SECRET_KEY = os.environ["SECRET_KEY"]
+import qrcode
+import qrcode.image.pure
+from jose import JWTError, jwt
 
-ALGO = "HS256"
+from .config import get_settings
 
-def hash_password(password: str) -> str:
-    """Hash a password using bcrypt"""
-    if not password:
-        raise ValueError("Password cannot be empty")
-    # Ensure password is a string and encode to bytes
-    password_bytes = str(password).encode('utf-8')
-    # Hash the password with bcrypt
-    salt = bcrypt.gensalt(rounds=12)
-    hashed = bcrypt.hashpw(password_bytes, salt)
-    return hashed.decode('utf-8')
+settings = get_settings()
+ALGORITHM = "HS256"
 
-def verify_password(password: str, hashed_password: str) -> bool:
-    """Verify a password against a hashed password"""
-    if not password or not hashed_password:
-        return False
-    try:
-        password_bytes = str(password).encode('utf-8')
-        hashed_bytes = hashed_password.encode('utf-8')
-        return bcrypt.checkpw(password_bytes, hashed_bytes)
-    except Exception:
-        return False
+TokenType = Literal["access"]
 
-def create_token(user_id):
+
+# ── JWT access tokens ────────────────────────────────────────────────────────
+
+def create_access_token(user_id: int) -> str:
+    now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
-        "exp": datetime.utcnow() + timedelta(minutes=30)
+        "type": "access",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=settings.access_token_minutes)).timestamp()),
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGO)
+    return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 
-def verify_otp(secret, otp):
-    return pyotp.TOTP(secret).verify(otp)
 
-def verify_token(authorization: str = Header(None)):
-    """Verify JWT token from Authorization header"""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header missing")
-    
+def decode_access_token(token: str) -> int:
     try:
-        # Extract token from "Bearer <token>" format
-        if not authorization.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Invalid authorization format")
-        
-        token = authorization.split(" ")[1]
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGO])
-        
-        # Get user info from token
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token payload")
-        
-        # Return user info (only what's actually in the token)
-        return {"user_id": user_id}
-    
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    except IndexError:
-        raise HTTPException(status_code=401, detail="Invalid authorization format")
+        payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+    except JWTError as e:
+        raise ValueError("invalid token") from e
+    if payload.get("type") != "access":
+        raise ValueError("wrong token type")
+    sub = payload.get("sub")
+    if not sub:
+        raise ValueError("missing subject")
+    return int(sub)
+
+
+# ── Opaque token helpers (device tokens, auth codes) ────────────────────────
+
+def new_opaque_token() -> tuple[str, str]:
+    """Return (raw_token, sha256_hex). Store only the hash."""
+    raw = secrets.token_urlsafe(48)
+    return raw, hashlib.sha256(raw.encode()).hexdigest()
+
+
+def hash_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+# ── QR challenge signing ─────────────────────────────────────────────────────
+
+def sign_qr_challenge(session_id: str, timestamp: int) -> str:
+    """HMAC-SHA256 of 'session_id:timestamp' keyed with SECRET_KEY.
+
+    Returns a 32-char base64url string (truncated for URL compactness).
+    """
+    msg = f"{session_id}:{timestamp}".encode()
+    raw = hmac.new(settings.secret_key.encode(), msg, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")[:32]
+
+
+def verify_qr_challenge(session_id: str, timestamp: int, sig: str, max_age: int = 35) -> bool:
+    """Return True iff sig is valid and timestamp is within max_age seconds."""
+    if abs(time.time() - timestamp) > max_age:
+        return False
+    expected = sign_qr_challenge(session_id, timestamp)
+    return hmac.compare_digest(expected, sig)
+
+
+def build_scan_url(session_id: str) -> str:
+    ts = int(time.time())
+    sig = sign_qr_challenge(session_id, ts)
+    return f"{settings.app_base_url}/scan?s={session_id}&t={ts}&sig={sig}"
+
+
+# ── QR image generation ──────────────────────────────────────────────────────
+
+def generate_qr_data_url(content: str) -> str:
+    qr = qrcode.QRCode(box_size=6, border=2)
+    qr.add_data(content)
+    qr.make(fit=True)
+    img = qr.make_image(image_factory=qrcode.image.pure.PyPNGImage)
+    buf = io.BytesIO()
+    img.save(buf)
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{b64}"

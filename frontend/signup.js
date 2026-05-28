@@ -1,32 +1,43 @@
-document.getElementById("signupBtn").addEventListener("click", async () => {
-    console.log("Signup button clicked"); // 🔍 DEBUG
+import { api, showError } from "/static/util.js";
 
-    const fullName = document.getElementById("fullName").value;
-    const email = document.getElementById("email").value;
-    const accessKey = document.getElementById("accessKey").value;
-    const verifyKey = document.getElementById("verifyKey").value;
+const form = document.getElementById("signupForm");
+const submit = document.getElementById("submit");
+const errorBox = document.getElementById("error");
 
-    console.log({ fullName, email, accessKey, verifyKey }); // 🔍 DEBUG
+form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorBox.classList.add("hidden");
 
-    const res = await fetch("/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            full_name: fullName,
-            email: email,
-            access_key: accessKey,
-            verify_key: verifyKey
-        })
-    });
+    const full_name = document.getElementById("fullName").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const confirm = document.getElementById("confirm").value;
 
-    const data = await res.json();
-    console.log("Signup response:", data); // 🔍 DEBUG
-
-    if (!res.ok) {
-        alert(data.detail || "Signup failed");
+    if (password !== confirm) {
+        showError(errorBox, "Passwords do not match");
         return;
     }
 
-    // ✅ AFTER SIGNUP → LOGIN → FINGERPRINT → QR
-    window.location.href = "/login";
+    submit.disabled = true;
+    try {
+        const data = await api("/api/auth/signup", {
+            method: "POST",
+            body: JSON.stringify({ full_name, email, password }),
+        });
+        if (data.email_verification_required) {
+            document.querySelector(".heading h1").textContent = "Check your email";
+            document.querySelector(".heading p").textContent = `Sent a link to ${email}`;
+            document.querySelector(".card").innerHTML = `
+                <p style="text-align:center;color:rgba(240,232,220,0.65);font-size:0.875rem;line-height:1.8;padding:0.25rem 0">
+                    Click the verification link in your inbox to activate your account.<br>
+                    It expires in 24 hours.<br><br>
+                    Once verified, <a href="/login" style="color:#e0c07a;text-decoration:none">sign in here</a>.
+                </p>`;
+        } else {
+            window.location.href = "/login";
+        }
+    } catch (err) {
+        showError(errorBox, err.message);
+        submit.disabled = false;
+    }
 });

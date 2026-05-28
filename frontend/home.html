@@ -1,395 +1,556 @@
 <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard · Cipher</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-<html class="dark" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>CyberShield Command Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Noto+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#135bec",
-                        "background-light": "#f6f6f8",
-                        "background-dark": "#101622",
-                        "card-dark": "#1a2436",
-                        "card-border": "#232f48"
-                    },
-                    fontFamily: {
-                        "display": ["Space Grotesk", "sans-serif"],
-                        "body": ["Noto Sans", "sans-serif"],
-                    },
-                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
-                },
-            },
+        :root {
+            --bg:        #06091a;
+            --surface:   rgba(255,255,255,0.042);
+            --surface-2: rgba(255,255,255,0.028);
+            --gold:      #c4a35a;
+            --gold-lt:   #e0c07a;
+            --gold-dim:  rgba(196,163,90,0.10);
+            --gold-glow: rgba(196,163,90,0.22);
+            --text:      #f0e8dc;
+            --muted:     rgba(240,232,220,0.42);
+            --subtle:    rgba(240,232,220,0.18);
+            --divider:   rgba(255,255,255,0.065);
+            --err:       #f4a8a0;
+            --err-bg:    rgba(200,80,72,0.09);
+            --err-bd:    rgba(200,80,72,0.20);
+            --ok:        #6dbf8a;
         }
-    </script>
-<style>
-        /* Custom scrollbar for webkit */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+
+        html, body { height: 100%; }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(ellipse 90% 55% at 70% -8%, rgba(24,16,52,1) 0%, transparent 65%),
+                radial-gradient(ellipse 60% 40% at 10% 90%, rgba(14,10,36,1) 0%, transparent 55%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 0 1.5rem 4rem;
+            -webkit-font-smoothing: antialiased;
         }
-        ::-webkit-scrollbar-track {
-            background: #101622;
+
+        /* ── Crosshatch atmosphere ─────────────────────────────────────────── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+            background-size: 48px 48px;
+            mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, black 40%, transparent 100%);
+            -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, black 40%, transparent 100%);
         }
-        ::-webkit-scrollbar-thumb {
-            background: #232f48;
-            border-radius: 4px;
+
+        /* ── Ambient orbs ─────────────────────────────────────────────────── */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+            filter: blur(80px);
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #3a4b6b;
+        .orb-1 {
+            width: 640px; height: 640px;
+            background: radial-gradient(circle, rgba(196,163,90,0.18) 0%, transparent 68%);
+            top: -220px; right: -140px;
+            animation: driftA 32s ease-in-out infinite;
         }
-        
-        /* Animated background grid effect */
-        .bg-grid-pattern {
-            background-size: 50px 50px;
-            background-image: 
-                linear-gradient(to right, rgba(35, 47, 72, 0.4) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(35, 47, 72, 0.4) 1px, transparent 1px);
-            mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+        .orb-2 {
+            width: 480px; height: 480px;
+            background: radial-gradient(circle, rgba(70,55,160,0.16) 0%, transparent 68%);
+            bottom: -140px; left: -100px;
+            animation: driftB 26s ease-in-out infinite;
+        }
+        .orb-3 {
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, rgba(196,163,90,0.08) 0%, transparent 68%);
+            top: 45%; left: 50%;
+            transform: translateX(-50%);
+            filter: blur(100px);
+        }
+
+        @keyframes driftA {
+            0%,100% { transform: translate(0,0) scale(1); }
+            33%     { transform: translate(-30px,40px) scale(1.05); }
+            66%     { transform: translate(20px,-30px) scale(0.95); }
+        }
+        @keyframes driftB {
+            0%,100% { transform: translate(0,0); }
+            50%     { transform: translate(40px,-35px) scale(1.08); }
+        }
+
+        /* ── Grain ─────────────────────────────────────────────────────────── */
+        .grain {
+            position: fixed; inset: 0; pointer-events: none; z-index: 200; opacity: 0.036;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        /* ── Page scaffold ─────────────────────────────────────────────────── */
+        .page {
+            position: relative;
+            z-index: 10;
+            max-width: 820px;
+            margin: 0 auto;
+        }
+
+        /* ── Entrance animations ───────────────────────────────────────────── */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+        .reveal      { animation: fadeUp .7s cubic-bezier(.16,1,.3,1) both; }
+        .reveal-d1   { animation-delay: .10s; }
+        .reveal-d2   { animation-delay: .22s; }
+        .reveal-d3   { animation-delay: .34s; }
+        .reveal-d4   { animation-delay: .44s; }
+
+        /* ── Nav ───────────────────────────────────────────────────────────── */
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.75rem 0 2.5rem;
+            border-bottom: 1px solid var(--divider);
+            margin-bottom: 3.5rem;
+        }
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+        .logo-icon {
+            width: 30px; height: 30px;
+            background: linear-gradient(145deg, #b8942e, #d4b060, #c4a35a);
+            border-radius: 8px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 0 1px rgba(196,163,90,0.36), 0 4px 14px rgba(196,163,90,0.24);
+        }
+        .logo-name {
+            font-family: 'Inter', system-ui, sans-serif;
+            font-size: 1.0625rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            color: var(--text);
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+        .secured-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.6875rem;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        .secured-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--ok);
+            animation: pulse-ok 2.4s ease-in-out infinite;
+        }
+        @keyframes pulse-ok {
+            0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(109,191,138,0.5); }
+            50%     { opacity: 0.7; box-shadow: 0 0 0 4px rgba(109,191,138,0); }
+        }
+
+        #logout {
+            background: none;
+            border: 1px solid var(--divider);
+            border-radius: 7px;
+            padding: 0.38rem 0.85rem;
+            font-size: 0.6875rem;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            color: var(--muted);
+            font-family: 'Inter', system-ui, sans-serif;
+            cursor: pointer;
+            transition: border-color .2s, color .2s, background .2s;
+        }
+        #logout:hover {
+            border-color: rgba(255,255,255,0.16);
+            color: var(--text);
+            background: rgba(255,255,255,0.04);
+        }
+
+        /* ── Identity hero ─────────────────────────────────────────────────── */
+        .identity {
+            display: flex;
+            align-items: flex-start;
+            gap: 2rem;
+            margin-bottom: 3.5rem;
+        }
+
+        .avatar-wrap {
+            flex-shrink: 0;
+            position: relative;
+        }
+        .avatar-ring {
+            position: absolute;
+            inset: -5px;
+            border-radius: 50%;
+            border: 1px solid rgba(196,163,90,0.22);
+            animation: orbit-glow 4s ease-in-out infinite;
+        }
+        @keyframes orbit-glow {
+            0%,100% { box-shadow: 0 0 0 0 rgba(196,163,90,0); opacity: 0.6; }
+            50%     { box-shadow: 0 0 18px 2px rgba(196,163,90,0.14); opacity: 1; }
+        }
+        .avatar {
+            width: 68px; height: 68px;
+            border-radius: 50%;
+            background: var(--gold-dim);
+            border: 1.5px solid rgba(196,163,90,0.28);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Inter', system-ui, sans-serif;
+            font-size: 1.375rem;
+            font-weight: 600;
+            color: var(--gold-lt);
+        }
+
+        .identity-body {
+            flex: 1;
+            padding-top: 0.25rem;
+        }
+        .identity-name {
+            font-family: 'Inter', system-ui, sans-serif;
+            font-size: clamp(1.75rem, 4vw, 2.5rem);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1;
+            color: var(--text);
+            margin-bottom: 0.75rem;
+        }
+        .identity-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.35rem 1.25rem;
+        }
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8125rem;
+            color: var(--muted);
+            font-weight: 300;
+        }
+        .meta-item svg { flex-shrink: 0; opacity: 0.55; }
+        .meta-sep {
+            width: 3px; height: 3px;
+            border-radius: 50%;
+            background: var(--subtle);
+        }
+
+        .identity-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-top: 1rem;
+            padding: 0.3rem 0.75rem;
+            border-radius: 100px;
+            font-size: 0.6875rem;
+            font-weight: 500;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+            background: rgba(109,191,138,0.08);
+            border: 1px solid rgba(109,191,138,0.20);
+            color: rgba(109,191,138,0.80);
+        }
+
+        /* ── Section chrome ────────────────────────────────────────────────── */
+        .section-label {
+            font-size: 0.625rem;
+            font-weight: 500;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--subtle);
+        }
+        .section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--divider);
+            margin-bottom: 0;
+        }
+
+        /* ── Add-device button ──────────────────────────────────────────────── */
+        #btnAddDevice {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.4rem 0.9rem;
+            border-radius: 8px;
+            border: 1px solid rgba(196,163,90,0.24);
+            background: rgba(196,163,90,0.06);
+            font-size: 0.6875rem;
+            font-weight: 500;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            color: var(--gold-lt);
+            font-family: 'Inter', system-ui, sans-serif;
+            cursor: pointer;
+            transition: background .2s, border-color .2s;
+        }
+        #btnAddDevice:hover {
+            background: rgba(196,163,90,0.12);
+            border-color: rgba(196,163,90,0.38);
+        }
+
+        /* ── Device list ────────────────────────────────────────────────────── */
+        #devicesList { min-height: 3rem; }
+
+        .device-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--divider);
+            position: relative;
+            transition: background .2s;
+        }
+        .device-row::before {
+            content: '';
+            position: absolute;
+            left: -1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 2px;
+            height: 0;
+            border-radius: 2px;
+            background: var(--gold);
+            transition: height .25s cubic-bezier(.16,1,.3,1);
+        }
+        .device-row:hover::before { height: 60%; }
+        .device-row:last-child { border-bottom: none; }
+
+        .device-icon {
+            width: 36px; height: 36px;
+            border-radius: 9px;
+            background: var(--surface-2);
+            border: 1px solid var(--divider);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            color: var(--muted);
+            transition: border-color .2s, background .2s;
+        }
+        .device-row:hover .device-icon {
+            border-color: rgba(196,163,90,0.20);
+            background: var(--gold-dim);
+            color: var(--gold-lt);
+        }
+
+        .device-info { flex: 1; min-width: 0; }
+        .device-name {
+            font-size: 0.9375rem;
+            font-weight: 400;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 0.2rem;
+        }
+        .device-last {
+            font-size: 0.75rem;
+            color: var(--muted);
+            font-weight: 300;
+            font-family: 'Courier New', monospace;
+        }
+
+        .device-revoke {
+            flex-shrink: 0;
+            background: none;
+            border: 1px solid transparent;
+            border-radius: 7px;
+            padding: 0.35rem 0.7rem;
+            font-size: 0.6875rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: rgba(244,168,160,0.50);
+            font-family: 'Inter', system-ui, sans-serif;
+            cursor: pointer;
+            transition: color .2s, border-color .2s, background .2s;
+        }
+        .device-revoke:hover {
+            color: var(--err);
+            border-color: var(--err-bd);
+            background: var(--err-bg);
+        }
+
+        /* ── Empty state ────────────────────────────────────────────────────── */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem 1rem;
+            gap: 0.75rem;
+            text-align: center;
+        }
+        .empty-icon {
+            width: 44px; height: 44px;
+            border-radius: 12px;
+            background: var(--surface-2);
+            border: 1px solid var(--divider);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--subtle);
+            margin-bottom: 0.25rem;
+        }
+        .empty-state p { font-size: 0.8125rem; color: var(--muted); font-weight: 300; }
+
+        /* ── Loading skeleton ───────────────────────────────────────────────── */
+        @keyframes shimmer {
+            0%   { background-position: -300% 0; }
+            100% { background-position:  300% 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg,
+                rgba(255,255,255,0.03) 0%,
+                rgba(255,255,255,0.08) 45%,
+                rgba(255,255,255,0.03) 90%);
+            background-size: 300% 100%;
+            animation: shimmer 2s ease-in-out infinite;
+            border-radius: 6px;
+        }
+
+        /* ── Footer note ────────────────────────────────────────────────────── */
+        .footer-note {
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--divider);
+            font-size: 0.75rem;
+            color: var(--subtle);
+            line-height: 1.8;
+            text-align: center;
+            font-weight: 300;
+        }
+
+        /* ── Responsive ────────────────────────────────────────────────────── */
+        @media (max-width: 560px) {
+            .identity { flex-direction: column; gap: 1.25rem; }
+            .secured-badge { display: none; }
+            .device-row::before { display: none; }
         }
     </style>
 </head>
-<body class="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-white overflow-hidden h-screen flex flex-col">
-<!-- App Container -->
-<div class="flex flex-1 h-full overflow-hidden relative">
-<!-- Animated Background Overlay -->
-<div class="absolute inset-0 z-0 pointer-events-none bg-grid-pattern opacity-50"></div>
-<!-- Sidebar -->
-<aside class="w-64 bg-card-dark border-r border-card-border z-10 hidden md:flex flex-col h-full">
-<div class="p-5 flex items-center gap-3 border-b border-card-border">
-<div class="size-8 bg-primary rounded flex items-center justify-center text-white">
-<span class="material-symbols-outlined">security</span>
-</div>
-<h1 class="font-bold text-lg tracking-tight">CyberShield</h1>
-</div>
-<div class="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-6">
-<!-- User Profile -->
-<div class="flex items-center gap-3 px-2 mb-2">
-<div class="bg-center bg-no-repeat bg-cover rounded-full size-10 border-2 border-primary/30" data-alt="Administrator profile picture showing a serious professional" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCj6iQaU7KoNGhV1lOEgkMtZsBzX0mydv26RLMcy4U9A0WHV_CMzg33UYJw2hf9IcuO51ACtxlG_8asDvuR_l6s0KUuUsANG32RzmvxcgzMcoqwgel_b6WI5kkT5trIpMR1xaEDgL6L-BqxlBWwpQsmGI1HSfgdJhUDNSKnGiPWEeWkQ03KTpMBhQr2gsLxcCkUmsjc38Rp60YUsVCuGva7sc0xfl7GazHdInPSfX4gJnENdnKzO7V0sTMrf_rtrgYGc5WSkwzbsu4");'></div>
-<div class="flex flex-col overflow-hidden">
-<h2 class="text-white text-sm font-medium leading-none truncate">Admin User</h2>
-<p class="text-slate-400 text-xs font-normal mt-1 truncate">Security Ops</p>
-</div>
-</div>
-<!-- Navigation -->
-<nav class="flex flex-col gap-1">
-<p class="px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Main</p>
-<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary text-white shadow-lg shadow-primary/20" href="#">
-<span class="material-symbols-outlined text-[20px]">dashboard</span>
-<span class="text-sm font-medium">Dashboard</span>
-</a>
-<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors" href="#">
-<span class="material-symbols-outlined text-[20px]">map</span>
-<span class="text-sm font-medium">Threat Map</span>
-</a>
-<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors" href="#">
-<span class="material-symbols-outlined text-[20px]">article</span>
-<span class="text-sm font-medium">Logs</span>
-</a>
-<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors" href="#">
-<span class="material-symbols-outlined text-[20px]">build</span>
-<span class="text-sm font-medium">Tools</span>
-</a>
-</nav>
-<nav class="flex flex-col gap-1">
-<p class="px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">System</p>
-<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors" href="#">
-<span class="material-symbols-outlined text-[20px]">settings</span>
-<span class="text-sm font-medium">Settings</span>
-</a>
-<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors" href="#">
-<span class="material-symbols-outlined text-[20px]">notifications</span>
-<span class="text-sm font-medium">Alerts</span>
-<span class="ml-auto bg-red-500/20 text-red-400 text-xs font-bold px-2 py-0.5 rounded-full">3</span>
-</a>
-</nav>
-</div>
-<div class="p-4 border-t border-card-border">
-<button class="flex w-full items-center gap-2 text-slate-400 hover:text-white text-sm font-medium transition-colors">
-<span class="material-symbols-outlined text-[20px]">logout</span>
-                    Sign Out
+<body>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="orb orb-1" aria-hidden="true"></div>
+    <div class="orb orb-2" aria-hidden="true"></div>
+    <div class="orb orb-3" aria-hidden="true"></div>
+
+    <div class="page">
+
+        <!-- Nav -->
+        <nav class="reveal">
+            <a class="nav-logo" href="/home">
+                <div class="logo-icon">
+                    <svg width="15" height="17" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+                        <path d="M9 2L17 18H1L9 2Z" fill="none" stroke="rgba(255,255,255,0.94)" stroke-width="1.5" stroke-linejoin="round"/>
+                        <line x1="4.5" y1="13.5" x2="13.5" y2="13.5" stroke="rgba(255,255,255,0.72)" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <span class="logo-name">Cipher</span>
+            </a>
+            <div class="nav-right">
+                <div class="secured-badge">
+                    <div class="secured-dot"></div>
+                    Secured Session
+                </div>
+                <button id="logout">Sign out</button>
+            </div>
+        </nav>
+
+        <!-- Identity hero -->
+        <section class="identity reveal reveal-d1">
+            <div class="avatar-wrap">
+                <div class="avatar-ring"></div>
+                <div class="avatar" id="avatarInitials"></div>
+            </div>
+            <div class="identity-body">
+                <h1 class="identity-name" id="profileName"></h1>
+                <div class="identity-meta">
+                    <span class="meta-item">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                        </svg>
+                        <span id="profileEmail"></span>
+                    </span>
+                    <div class="meta-sep"></div>
+                    <span class="meta-item">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        Member since <span id="profileDate"></span>
+                    </span>
+                </div>
+                <div class="identity-tag">
+                    <div class="secured-dot" style="width:5px;height:5px"></div>
+                    Active
+                </div>
+            </div>
+        </section>
+
+        <!-- Divider rule -->
+        <div class="reveal reveal-d2"
+             style="height:1px;background:linear-gradient(to right,transparent,rgba(196,163,90,0.18) 20%,rgba(196,163,90,0.18) 80%,transparent);margin-bottom:2.75rem"></div>
+
+        <!-- Devices section -->
+        <section class="reveal reveal-d3">
+            <div class="section-head">
+                <span class="section-label">Trusted Devices</span>
+                <button id="btnAddDevice">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    Add Device
                 </button>
-</div>
-</aside>
-<!-- Main Content -->
-<main class="flex-1 flex flex-col h-full overflow-hidden relative z-10">
-<!-- Top Header -->
-<header class="h-16 border-b border-card-border bg-background-dark/80 backdrop-blur-sm flex items-center justify-between px-6 shrink-0">
-<div class="flex items-center gap-4">
-<button class="md:hidden text-slate-400 hover:text-white">
-<span class="material-symbols-outlined">menu</span>
-</button>
-<h2 class="text-lg font-bold text-white hidden sm:block">Command Center</h2>
-</div>
-<div class="flex items-center gap-6">
-<!-- Search -->
-<div class="hidden md:flex items-center relative group">
-<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-primary transition-colors">
-<span class="material-symbols-outlined text-[20px]">search</span>
-</div>
-<input class="bg-card-dark border border-card-border text-slate-300 text-sm rounded-lg focus:ring-1 focus:ring-primary focus:border-primary block w-64 pl-10 p-2 placeholder-slate-500 transition-all" placeholder="Search logs, IPs, threats..." type="text"/>
-<div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-<kbd class="inline-flex items-center border border-slate-700 rounded px-1.5 text-[10px] font-medium text-slate-500">⌘K</kbd>
-</div>
-</div>
-<!-- Actions -->
-<div class="flex items-center gap-3">
-<button class="relative p-2 text-slate-400 hover:text-white bg-card-dark hover:bg-card-border rounded-lg transition-colors border border-transparent hover:border-slate-700">
-<span class="material-symbols-outlined text-[20px]">notifications</span>
-<span class="absolute top-1.5 right-2 size-2 bg-red-500 rounded-full animate-pulse"></span>
-</button>
-<button class="p-2 text-slate-400 hover:text-white bg-card-dark hover:bg-card-border rounded-lg transition-colors border border-transparent hover:border-slate-700">
-<span class="material-symbols-outlined text-[20px]">help</span>
-</button>
-</div>
-</div>
-</header>
-<!-- Scrollable Content Area -->
-<div class="flex-1 overflow-y-auto p-4 md:p-8">
-<div class="max-w-[1400px] mx-auto flex flex-col gap-6">
-<!-- Stats Grid -->
-<section class="grid grid-cols-1 md:grid-cols-3 gap-4">
-<!-- Stat 1 -->
-<div class="bg-card-dark border border-card-border rounded-xl p-6 relative overflow-hidden group hover:border-primary/50 transition-colors">
-<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-<span class="material-symbols-outlined text-6xl text-primary">shield</span>
-</div>
-<div class="flex flex-col gap-1 relative z-10">
-<p class="text-slate-400 text-sm font-medium">System Integrity</p>
-<div class="flex items-baseline gap-2">
-<h3 class="text-3xl font-bold text-white">98%</h3>
-<span class="text-emerald-500 text-sm font-medium bg-emerald-500/10 px-2 py-0.5 rounded flex items-center gap-1">
-<span class="material-symbols-outlined text-[14px]">trending_up</span> Stable
-                                    </span>
-</div>
-<div class="w-full bg-slate-800 rounded-full h-1.5 mt-4">
-<div class="bg-emerald-500 h-1.5 rounded-full" style="width: 98%"></div>
-</div>
-</div>
-</div>
-<!-- Stat 2 -->
-<div class="bg-card-dark border border-card-border rounded-xl p-6 relative overflow-hidden group hover:border-primary/50 transition-colors">
-<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-<span class="material-symbols-outlined text-6xl text-primary">gpp_maybe</span>
-</div>
-<div class="flex flex-col gap-1 relative z-10">
-<p class="text-slate-400 text-sm font-medium">Threats Blocked (24h)</p>
-<div class="flex items-baseline gap-2">
-<h3 class="text-3xl font-bold text-white">1,204</h3>
-<span class="text-emerald-500 text-sm font-medium bg-emerald-500/10 px-2 py-0.5 rounded flex items-center gap-1">
-                                        +15%
-                                    </span>
-</div>
-<p class="text-xs text-slate-500 mt-4">Last blocked: IP 192.168.4.22 (SQL Injection)</p>
-</div>
-</div>
-<!-- Stat 3 -->
-<div class="bg-card-dark border border-card-border rounded-xl p-6 relative overflow-hidden group hover:border-primary/50 transition-colors">
-<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-<span class="material-symbols-outlined text-6xl text-primary">public</span>
-</div>
-<div class="flex flex-col gap-1 relative z-10">
-<p class="text-slate-400 text-sm font-medium">Global Defcon</p>
-<div class="flex items-baseline gap-2">
-<h3 class="text-3xl font-bold text-white">Level 4</h3>
-<span class="text-yellow-500 text-sm font-medium bg-yellow-500/10 px-2 py-0.5 rounded">
-                                        Elevated
-                                    </span>
-</div>
-<p class="text-xs text-slate-500 mt-4">Regional Alert: Eastern Europe Sector</p>
-</div>
-</div>
-</section>
-<!-- Main Charts & Quick Actions -->
-<section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-<!-- Chart Area -->
-<div class="lg:col-span-2 bg-card-dark border border-card-border rounded-xl p-6">
-<div class="flex items-center justify-between mb-6">
-<div>
-<h3 class="text-white text-lg font-bold">Network Traffic Analysis</h3>
-<p class="text-slate-400 text-sm">Real-time throughput (Mb/s)</p>
-</div>
-<div class="flex gap-2">
-<span class="flex h-2 w-2 relative">
-<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-<span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-</span>
-<span class="text-emerald-500 text-xs font-bold uppercase tracking-wider">Live</span>
-</div>
-</div>
-<!-- Graph Visualization -->
-<div class="relative w-full h-64">
-<svg class="w-full h-full" fill="none" preserveaspectratio="none" viewbox="0 0 478 150" xmlns="http://www.w3.org/2000/svg">
-<defs>
-<lineargradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
-<stop offset="0%" stop-color="#135bec" stop-opacity="0.3"></stop>
-<stop offset="100%" stop-color="#135bec" stop-opacity="0"></stop>
-</lineargradient>
-</defs>
-<path d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25V150H0V109Z" fill="url(#chartGradient)"></path>
-<path d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25" stroke="#135bec" stroke-linecap="round" stroke-width="2"></path>
-</svg>
-</div>
-<!-- Legend / Toggles -->
-<div class="flex gap-6 mt-4 justify-center">
-<div class="flex items-center gap-2">
-<span class="w-3 h-3 rounded-full bg-primary"></span>
-<span class="text-sm text-slate-300">Inbound</span>
-</div>
-<div class="flex items-center gap-2">
-<span class="w-3 h-3 rounded-full bg-slate-600"></span>
-<span class="text-sm text-slate-300">Outbound</span>
-</div>
-<div class="flex items-center gap-2">
-<span class="w-3 h-3 rounded-full bg-red-500"></span>
-<span class="text-sm text-slate-300">Anomalies</span>
-</div>
-</div>
-</div>
-<!-- Quick Actions Panel -->
-<div class="bg-card-dark border border-card-border rounded-xl p-6 flex flex-col">
-<h3 class="text-white text-lg font-bold mb-4">Quick Actions</h3>
-<div class="grid grid-cols-2 gap-3 flex-1">
-<button class="flex flex-col items-center justify-center gap-2 p-4 bg-primary/10 hover:bg-primary/20 border border-primary/20 hover:border-primary text-primary rounded-lg transition-all group">
-<span class="material-symbols-outlined text-3xl group-hover:scale-110 transition-transform">radar</span>
-<span class="text-sm font-semibold">Run Scan</span>
-</button>
-<button class="flex flex-col items-center justify-center gap-2 p-4 bg-slate-800/50 hover:bg-slate-800 border border-card-border hover:border-slate-600 text-slate-300 hover:text-white rounded-lg transition-all group">
-<span class="material-symbols-outlined text-3xl group-hover:scale-110 transition-transform">security_update_good</span>
-<span class="text-sm font-semibold">Update Firewall</span>
-</button>
-<button class="flex flex-col items-center justify-center gap-2 p-4 bg-slate-800/50 hover:bg-slate-800 border border-card-border hover:border-slate-600 text-slate-300 hover:text-white rounded-lg transition-all group">
-<span class="material-symbols-outlined text-3xl group-hover:scale-110 transition-transform">bug_report</span>
-<span class="text-sm font-semibold">Pen Test</span>
-</button>
-<button class="flex flex-col items-center justify-center gap-2 p-4 bg-slate-800/50 hover:bg-slate-800 border border-card-border hover:border-slate-600 text-slate-300 hover:text-white rounded-lg transition-all group">
-<span class="material-symbols-outlined text-3xl group-hover:scale-110 transition-transform">download</span>
-<span class="text-sm font-semibold">Export Report</span>
-</button>
-</div>
-<div class="mt-4 pt-4 border-t border-card-border">
-<div class="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-start gap-3">
-<span class="material-symbols-outlined text-red-500 mt-0.5">warning</span>
-<div>
-<p class="text-red-400 text-sm font-bold">Critical Update Required</p>
-<p class="text-red-400/70 text-xs mt-1">Core security module v4.2.1 pending.</p>
-<button class="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded mt-2 font-medium transition-colors">Install Now</button>
-</div>
-</div>
-</div>
-</div>
-</section>
-<!-- Recent Activity Log -->
-<section class="bg-card-dark border border-card-border rounded-xl overflow-hidden">
-<div class="p-6 border-b border-card-border flex items-center justify-between">
-<h3 class="text-white text-lg font-bold">Recent Activity Logs</h3>
-<button class="text-primary hover:text-blue-400 text-sm font-medium flex items-center gap-1">
-                                View All Logs <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
-</button>
-</div>
-<div class="overflow-x-auto">
-<table class="w-full text-left border-collapse">
-<thead>
-<tr class="bg-slate-800/30 text-slate-400 text-sm border-b border-card-border">
-<th class="p-4 font-medium uppercase tracking-wider text-xs">Time</th>
-<th class="p-4 font-medium uppercase tracking-wider text-xs">Event Type</th>
-<th class="p-4 font-medium uppercase tracking-wider text-xs">Source / IP</th>
-<th class="p-4 font-medium uppercase tracking-wider text-xs">Severity</th>
-<th class="p-4 font-medium uppercase tracking-wider text-xs">Status</th>
-<th class="p-4 font-medium uppercase tracking-wider text-xs text-right">Action</th>
-</tr>
-</thead>
-<tbody class="text-sm divide-y divide-card-border">
-<tr class="hover:bg-slate-800/20 transition-colors">
-<td class="p-4 text-slate-300 font-mono">10:42:15 AM</td>
-<td class="p-4 text-white font-medium">Unauthorized Access Attempt</td>
-<td class="p-4 text-slate-400 font-mono">192.168.0.45</td>
-<td class="p-4">
-<span class="bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded text-xs font-bold uppercase">High</span>
-</td>
-<td class="p-4">
-<div class="flex items-center gap-2">
-<span class="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>
-<span class="text-emerald-500 font-medium">Blocked</span>
-</div>
-</td>
-<td class="p-4 text-right">
-<button class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-700">
-<span class="material-symbols-outlined text-[20px]">more_vert</span>
-</button>
-</td>
-</tr>
-<tr class="hover:bg-slate-800/20 transition-colors">
-<td class="p-4 text-slate-300 font-mono">10:38:02 AM</td>
-<td class="p-4 text-white font-medium">Port Scan Detected</td>
-<td class="p-4 text-slate-400 font-mono">45.22.19.112</td>
-<td class="p-4">
-<span class="bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-1 rounded text-xs font-bold uppercase">Medium</span>
-</td>
-<td class="p-4">
-<div class="flex items-center gap-2">
-<span class="material-symbols-outlined text-yellow-500 text-[18px]">warning</span>
-<span class="text-yellow-500 font-medium">Flagged</span>
-</div>
-</td>
-<td class="p-4 text-right">
-<button class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-700">
-<span class="material-symbols-outlined text-[20px]">more_vert</span>
-</button>
-</td>
-</tr>
-<tr class="hover:bg-slate-800/20 transition-colors">
-<td class="p-4 text-slate-300 font-mono">10:15:33 AM</td>
-<td class="p-4 text-white font-medium">Firewall Rules Updated</td>
-<td class="p-4 text-slate-400 font-mono">System (Admin)</td>
-<td class="p-4">
-<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-1 rounded text-xs font-bold uppercase">Info</span>
-</td>
-<td class="p-4">
-<div class="flex items-center gap-2">
-<span class="material-symbols-outlined text-emerald-500 text-[18px]">check</span>
-<span class="text-slate-300 font-medium">Success</span>
-</div>
-</td>
-<td class="p-4 text-right">
-<button class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-700">
-<span class="material-symbols-outlined text-[20px]">more_vert</span>
-</button>
-</td>
-</tr>
-<tr class="hover:bg-slate-800/20 transition-colors">
-<td class="p-4 text-slate-300 font-mono">09:55:12 AM</td>
-<td class="p-4 text-white font-medium">Data Backup Completed</td>
-<td class="p-4 text-slate-400 font-mono">Auto-Job #4291</td>
-<td class="p-4">
-<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded text-xs font-bold uppercase">Low</span>
-</td>
-<td class="p-4">
-<div class="flex items-center gap-2">
-<span class="material-symbols-outlined text-emerald-500 text-[18px]">check</span>
-<span class="text-slate-300 font-medium">Success</span>
-</div>
-</td>
-<td class="p-4 text-right">
-<button class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-700">
-<span class="material-symbols-outlined text-[20px]">more_vert</span>
-</button>
-</td>
-</tr>
-</tbody>
-</table>
-</div>
-</section>
-</div>
-</div>
-</main>
-</div>
-<script src="/static/home.js"></script>
-</body></html>
+            </div>
+            <div id="devicesList" style="padding-left:1.5rem"></div>
+        </section>
+
+        <!-- Footer note -->
+        <p class="footer-note reveal reveal-d4">
+            Enrolled devices approve sign-ins by scanning a QR code — no password required.<br>
+            Revoke a device to permanently remove its authentication capability.
+        </p>
+
+    </div>
+
+    <script type="module" src="/static/home.js"></script>
+</body>
+</html>

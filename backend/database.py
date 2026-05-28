@@ -1,22 +1,20 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from datetime import datetime
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-DB_NAME = "auth.db"
-DATABASE_URL = f"sqlite:///./{DB_NAME}"
+from .config import get_settings
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+settings = get_settings()
+
+connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+engine = create_engine(settings.database_url, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+Base = declarative_base()
+
+
 def get_db():
-    """Dependency for FastAPI routes"""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-def init_db():
-    """Initialize database tables"""
-    from .models import Base
-    Base.metadata.create_all(bind=engine)

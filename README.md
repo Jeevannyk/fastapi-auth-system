@@ -1,441 +1,134 @@
-# FastAPI Authentication System 🚀
+# Cipher Auth
 
-A modern, secure authentication system built with FastAPI, featuring multi-step authentication flow with biometric verification and QR code generation.
+A production-shaped FastAPI authentication service. Cookie-based sessions, refresh-token rotation, TOTP two-factor, email verification, password reset, account lockout, rate limiting, Alembic migrations, and a Postgres-ready Docker setup.
 
-## ✨ Features
+## Stack
 
-- **Multi-Step Authentication Flow**: Email/Password → Biometric Fingerprint → QR Code → Home Dashboard
-- **Secure Password Hashing**: Industry-standard bcrypt with 12-round salt
-- **JWT Token Authentication**: Stateless session management with 30-minute expiry
-- **SQLAlchemy ORM**: Type-safe database operations with declarative models
-- **Modern UI**: Responsive cybersecurity-themed interface with TailwindCSS
-- **Path Traversal Protection**: UUID validation preventing malicious session access
-- **Timezone-aware Sessions**: UTC datetime handling for global consistency
-- **CORS Configuration**: Environment-based security settings
+- FastAPI + Pydantic v2 + pydantic-settings
+- SQLAlchemy 2.x + Alembic
+- bcrypt, python-jose (JWT), pyotp (TOTP), qrcode
+- slowapi for rate limiting
+- SQLite for local dev, Postgres for prod (psycopg 3)
+- Vanilla JS frontend (no build step)
 
-## 🛠️ Tech Stack
+## Auth model
 
-**Backend**
-- FastAPI 0.127.0 - High-performance async web framework
-- SQLAlchemy 2.0.46 - SQL toolkit and ORM
-- Bcrypt 5.0.0 - Password hashing
-- Python-jose 3.5.0 + PyJWT 2.10.1 - JWT token management
-- QRCode 8.2 - QR code generation
+- **Access tokens** — short-lived JWT in an `HttpOnly SameSite=Lax` cookie at path `/`. 15 min default.
+- **Refresh tokens** — opaque random tokens; only their SHA-256 hash lives in the database. Stored in a separate `HttpOnly` cookie scoped to `/api/auth`. On `/refresh`, the old token is revoked and a new one is issued (rotation).
+- **Email verification** — new accounts receive a 24-hour verification link. Set `EMAIL_ENABLED=false` (default) to skip in dev; auto-verifies immediately. Unverified accounts cannot log in.
+- **Password reset** — time-limited (1 hour) reset links sent by email. Always returns a generic success message to prevent email enumeration. Resets the account lockout on success.
+- **2FA / TOTP** — RFC 6238. When enabled, `/login` returns `requires_2fa: true` and sets a short-lived `pending_2fa` cookie. The client posts a 6-digit code to `/login/2fa` to finalize. QR code generated server-side.
+- **Lockout** — after 5 failed logins the account locks for 15 minutes (configurable).
+- **Rate limiting** — `5/minute` on `/login`, `3/minute` on `/signup` (per IP, configurable).
+- **HTTPS enforcement** — when `ENVIRONMENT=production`, HTTP requests are automatically redirected to HTTPS.
 
-**Frontend**
-- HTML5, CSS3, Vanilla JavaScript
-- TailwindCSS 3.x - Utility-first CSS
-- Material Icons - Icon library
+## Quick start (local)
 
-**Database**
-- SQLite (development)
-- Production-ready for PostgreSQL/MySQL
-
-## 📁 Project Structure
-
-```
-fastapi-auth-system/
-├── backend/
-│   ├── __init__.py
-│   ├── main.py          # FastAPI app & routes
-│   ├── models.py        # SQLAlchemy User & Session models
-│   ├── database.py      # Database config & connection
-│   └── security.py      # Password hashing & JWT tokens
-├── frontend/
-│   ├── login.html       # Login page
-│   ├── login.js         # Login logic
-│   ├── signup.html      # Registration page
-│   ├── signup.js        # Signup logic
-│   ├── home.html        # Dashboard
-│   ├── home.js          # Dashboard logic
-│   ├── fingerprint.js   # Biometric verification
-├── qrs/                 # Generated QR code images
-├── auth.db              # SQLite database
-├── init_db.py           # Database initialization script
-├── check_db.py          # Database inspection utility
-├── test_complete.py     # End-to-end test suite
-├── requirements.txt     # Python dependencies
-├── .env.example         # Environment variables template
-├── start.bat            # Windows startup script
-└── start.sh             # Unix startup script
-
-```
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Python 3.8 or higher
-- pip (Python package installer)
-
-### Installation
-
-1. **Clone the repository**
-```bash
-git clone <repository-url>
-cd fastapi-auth-system
-```
-
-2. **Create virtual environment (recommended)**
 ```bash
 python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-
-# macOS/Linux
-source .venv/bin/activate
-```
-
-3. **Install dependencies**
-```bash
+. .venv/Scripts/activate            # PowerShell: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+
+cp .env.example .env                # then edit SECRET_KEY
+alembic upgrade head
+
+uvicorn backend.main:app --reload
 ```
 
-4. **Set up environment variables** (optional)
+Open <http://127.0.0.1:8000>. API docs at `/docs`.
+
+## Quick start (Docker + Postgres)
+
 ```bash
-# Windows
-copy .env.example .env
-
-# macOS/Linux
-cp .env.example .env
-
-# Edit .env and set a secure SECRET_KEY (random 32+ character string)
+echo "SECRET_KEY=$(python -c 'import secrets;print(secrets.token_urlsafe(48))')" > .env
+docker compose up --build
 ```
 
-5. **Initialize the database**
-```bash
-python init_db.py
-```
+Postgres + the app start together; migrations run automatically on startup.
 
-This creates `auth.db` with a test user:
-- **Email**: test@example.com
-- **Access Key**: password123
+## Email setup
 
-## 🏃 Running the Application
-
-### Option 1: Direct Command
-```bash
-uvicorn backend.main:app --host 127.0.0.1 --port 8000
-```
-
-### Option 2: With Auto-reload (Development)
-```bash
-uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-### Option 3: Using Startup Scripts
-
-**Windows:**
-```bash
-start.bat
-```
-
-**macOS/Linux:**
-```bash
-chmod +x start.sh
-./start.sh
-```
-
-The application will be available at:
-- **Frontend**: http://127.0.0.1:8000/
-- **API Docs**: http://127.0.0.1:8000/docs
-- **Health Check**: http://127.0.0.1:8000/health
-
-## 📖 API Documentation
-
-### Authentication Flow
-
-The system implements a 3-step authentication process:
-
-#### Step 1: Login (Credentials)
-**POST** `/login`
-
-```json
-Request:
-{
-  "email": "test@example.com",
-  "access_key": "password123"
-}
-
-Response:
-{
-  "message": "Credentials verified",
-  "access_token": "eyJhbGc...",
-  "next": "fingerprint"
-}
-```
-
-#### Step 2: Biometric Verification
-**POST** `/fingerprint`
-
-```json
-Request:
-{
-  "email": "test@example.com"
-}
-
-Response:
-{
-  "message": "Biometric verified",
-  "session_id": "550e8400-e29b-41d4-a716-446655440000",
-  "next": "qr"
-}
-```
-
-#### Step 3: QR Code Generation
-**GET** `/qr/{session_id}`
-
-```json
-Response:
-{
-  "qr_image": "qrs/550e8400-e29b-41d4-a716-446655440000.png",
-  "payload": "antigravity://connect/550e8400-e29b-41d4-a716-446655440000"
-}
-```
-
-**GET** `/qr-image/{session_id}`
-- Returns QR code image as PNG
-- Content-Type: `image/png`
-
-### Other Endpoints
-
-**GET** `/health`
-```json
-{
-  "status": "ok"
-}
-```
-
-**POST** `/signup`
-```json
-Request:
-{
-  "full_name": "John Doe",
-  "email": "john@example.com",
-  "access_key": "securepassword123"
-}
-
-Response:
-{
-  "message": "User registered successfully",
-  "email": "john@example.com"
-}
-```
-
-## 🧪 Testing
-
-### Run Complete Test Suite
-```bash
-# Make sure server is running first
-python test_complete.py
-```
-
-Tests include:
-- ✅ Health check
-- ✅ Frontend page loading
-- ✅ User signup
-- ✅ User login & JWT tokens
-- ✅ Invalid credentials rejection
-- ✅ Fingerprint/session creation
-- ✅ QR code generation
-- ✅ QR image serving
-- ✅ Path traversal protection
-
-### Individual Test Scripts
-```bash
-python test_database.py    # Database connectivity
-python test_signup.py      # Signup endpoint
-python test_login.py       # Login endpoint
-```
-
-### Database Utilities
-```bash
-python check_db.py         # View all users and sessions
-python init_db.py          # Reset database with test user
-```
-
-## 🔒 Security Features
-
-1. **Password Security**
-   - Bcrypt hashing with 12-round salt
-   - 72-byte password limit (bcrypt standard)
-   - Never stores plaintext passwords
-
-2. **JWT Tokens**
-   - HS256 algorithm
-   - 30-minute expiry
-   - **⚠️ Security Notice**: Current implementation uses localStorage which is vulnerable to XSS attacks
-   
-   **Recommended Migration to HttpOnly Cookies:**
-   - Set JWT in `Set-Cookie` header with `HttpOnly`, `Secure`, and `SameSite=Strict` flags
-   - Browser automatically includes cookie in requests (no JavaScript access)
-   - Prevents token theft via XSS exploits
-   
-   **If localStorage Must Be Retained:**
-   - Implement Content Security Policy (CSP) headers to prevent inline scripts
-   - Use input sanitization (DOMPurify) for all user-generated content
-   - Add CSRF protection tokens for state-changing operations
-   - Consider short token expiry (5-15 minutes) with refresh tokens
-   - Enable SameSite cookie attribute on session cookies
-   
-   **Trade-offs:**
-   - HttpOnly cookies: Better XSS protection but requires CSRF tokens
-   - localStorage: Easier cross-domain support but vulnerable to XSS
-   
-   *(Implementation code for HttpOnly cookie-based JWT handling available upon request)*
-
-3. **Session Management**
-   - UUID-based session IDs
-   - Timezone-aware timestamps
-   - Path traversal validation
-
-4. **Input Validation**
-   - Pydantic models for request validation
-   - Email format validation
-   - UUID format validation
-   - SQL injection protection via ORM
-
-5. **CORS Configuration**
-   - Environment-based allowed origins
-   - Credentials support
-   - Configurable methods and headers
-
-## 🗄️ Database Schema
-
-### Users Table
-```sql
-id           INTEGER PRIMARY KEY AUTOINCREMENT
-full_name    VARCHAR NOT NULL
-email        VARCHAR UNIQUE NOT NULL
-password_hash VARCHAR NOT NULL
-created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
-```
-
-### Sessions Table
-```sql
-session_id   VARCHAR(36) PRIMARY KEY  -- UUID format
-email        VARCHAR NOT NULL
-created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
-```
-
-## 🛠️ Troubleshooting
-
-### Port Already in Use
-```bash
-# Windows - Kill process on port 8000
-netstat -ano | findstr :8000
-taskkill /PID <PID> /F
-
-# macOS/Linux
-lsof -ti:8000 | xargs kill -9
-```
-
-### Database Locked Error
-```bash
-# Close all connections and reinitialize
-python init_db.py
-```
-
-### Module Not Found Error
-```bash
-# Ensure virtual environment is activated
-pip install -r requirements.txt
-```
-
-## 📝 Environment Variables
-
-Create `.env` file based on `.env.example`:
+By default `EMAIL_ENABLED=false` — users are verified instantly and no SMTP server is needed. To enable real emails:
 
 ```env
-SECRET_KEY=your-secret-key-here-minimum-32-characters
-DATABASE_URL=sqlite:///./auth.db
-ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
-TOKEN_EXPIRE_MINUTES=30
+EMAIL_ENABLED=true
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=user@example.com
+SMTP_PASSWORD=your-password
+SMTP_FROM=noreply@cipher.app
+APP_BASE_URL=https://your-domain.com
 ```
 
-## 🤝 Contributing
+## API
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+| Method | Path                        | Notes                                              |
+| ------ | --------------------------- | -------------------------------------------------- |
+| POST   | `/api/auth/signup`          | `{full_name, email, password}` → 201               |
+| GET    | `/api/auth/verify-email`    | `?token=xxx` — activates account                   |
+| POST   | `/api/auth/login`           | Sets cookies; may return `requires_2fa: true`      |
+| POST   | `/api/auth/login/2fa`       | `{user_id, code}` — completes 2FA login            |
+| POST   | `/api/auth/refresh`         | Rotates refresh + access cookies                   |
+| POST   | `/api/auth/logout`          | Revokes refresh token, clears cookies              |
+| GET    | `/api/auth/me`              | Current user (requires auth)                       |
+| POST   | `/api/auth/forgot-password` | `{email}` — sends reset link if registered        |
+| POST   | `/api/auth/reset-password`  | `{token, password}` — sets new password            |
+| POST   | `/api/2fa/setup`            | Returns secret + otpauth URL + QR code data URL    |
+| POST   | `/api/2fa/enable`           | Confirms with a TOTP code                          |
+| POST   | `/api/2fa/disable`          | Confirms with a TOTP code                          |
+| GET    | `/health`                   | Liveness check                                     |
 
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🙏 Acknowledgments
-
-- FastAPI for the excellent web framework
-- SQLAlchemy for robust ORM
-- TailwindCSS for beautiful styling
-
----
-
-**Built with ❤️ using FastAPI**
-
-Access at:
-- **Frontend**: http://127.0.0.1:8000
-- **API Docs**: http://127.0.0.1:8000/docs
-
-## �️ Utility Scripts
-
-### User
-- `id`, `full_name`, `email` (unique), `password_hash`, `created_at`
-
-### Session
-- `session_id` (UUID), `email`, `created_at` (expires in 5 minutes)
-
-## 🛠️ Utility Scripts
+## Tests
 
 ```bash
-python check_db.py        # List all users
-python add_user.py         # Add test user
-python test_signup.py      # Test signup endpoint
-python test_login.py       # Test login endpoint
-python test_database.py    # Database connection test
+pytest
 ```
 
-## 🐛 Fixed Issues
+The suite uses a throwaway SQLite file and covers:
 
-✅ Database consistency (auth.db across all modules)
-✅ Proper User model with SQLAlchemy
-✅ Bcrypt password hashing (not SHA256)
-✅ JWT token authentication
-✅ Timezone-aware datetime
-✅ Path traversal protection
-✅ CORS security configuration
-✅ Frontend token storage
-✅ HTML encoding fixes
-✅ All API endpoint mismatches
+- Signup / login / refresh / logout / cookie handling
+- Email verification flow (valid token, expired token, single-use enforcement)
+- Password reset flow (valid token, expired token, lockout cleared, single-use enforcement)
+- Anti-enumeration (forgot-password returns identical response for any email)
+- TOTP setup + enforced 2FA login
+- Account lockout after failed attempts
 
-## 📂 Project Structure
-fastapi-auth-system/
-FASTAPI/
-│
-├── backend/
-│   ├── __init__.py
-│   ├── main.py
-│   ├── database.py
-│   ├── models.py
-│   └── security.py
-│
-├── frontend/
-│   ├── home.html
-│   ├── home.js
-│   ├── login.html
-│   ├── login.js
-│   ├── signup.html
-│   ├── signup.js
-│   └── fingerprint.js
-│
-├── tests/
-│   ├── test_login.py
-│   ├── test_signup.py
-│   └── test_database.py
-│
-├── .gitignore
-├── README.md
-├── requirements.txt
-└── DATABASE_STATUS.md
+## Production checklist
+
+- Set `ENVIRONMENT=production`, a real `SECRET_KEY`, and `DATABASE_URL` pointing to Postgres.
+- Terminate TLS in front of the app; set `COOKIE_SECURE=true`.
+- Set `EMAIL_ENABLED=true` and configure SMTP credentials.
+- Set `APP_BASE_URL` to the public HTTPS URL (used in verification/reset links).
+- Restrict `ALLOWED_ORIGINS` to the actual frontend origin.
+- Run `alembic upgrade head` on deploy.
+- The default rate-limit backend is in-memory; for multi-process deployments point slowapi at Redis.
+
+## Layout
+
+```
+backend/
+  config.py        settings (pydantic-settings)
+  database.py      engine, session, declarative Base
+  models.py        User, RefreshToken
+  schemas.py       request/response models
+  security.py      hashing, JWT, TOTP, QR code generation
+  email.py         SMTP email sending (verification + reset)
+  deps.py          current_user dependency
+  rate_limit.py    slowapi limiter
+  routes/
+    auth.py        signup/login/refresh/logout/me/verify-email/forgot-password/reset-password
+    twofa.py       setup/enable/disable
+    pages.py       HTML page routes
+  main.py          app factory
+frontend/
+  login.html / login.js
+  signup.html / signup.js
+  home.html / home.js
+  totp.html / totp.js
+  verify-email.html / verify-email.js
+  forgot-password.html / forgot-password.js
+  reset-password.html / reset-password.js
+  util.js          shared fetch + error helpers
+alembic/           migrations
+tests/             pytest suite
+```
