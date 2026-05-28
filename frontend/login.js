@@ -1,142 +1,387 @@
-// Login Form Handler
-document.addEventListener('DOMContentLoaded', function () {
-    const loginForm = document.querySelector('form');
-    const emailInput = document.querySelector('input[type="text"]');
-    const passwordInput = document.querySelector('input[type="password"]');
-    const submitButton = document.querySelector('button[type="button"]');
-    let errorContainer = document.getElementById('error-message');
+// ── Constants ────────────────────────────────────────────────────────────────
+const DEVICE_TOKEN_KEY = "cipher_device_token";
+const QR_ROTATE_SECS   = 30;   // refresh QR image every 30 s
+const SESSION_EXPIRE   = 90;   // show expired overlay after 90 s
 
-    // Create error container if it doesn't exist
-    if (!errorContainer && loginForm) {
-        errorContainer = document.createElement('div');
-        errorContainer.id = 'error-message';
-        errorContainer.className = 'mt-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-400 text-sm text-center';
-        errorContainer.style.display = 'none';
-        loginForm.appendChild(errorContainer);
+// ── Element refs ─────────────────────────────────────────────────────────────
+const tabSignup   = document.getElementById("tabSignup");
+const tabSignin   = document.getElementById("tabSignin");
+const formSignup  = document.getElementById("formSignup");
+const formSignin  = document.getElementById("formSignin");
+
+const signupForm  = document.getElementById("signupForm");
+const suName      = document.getElementById("su-name");
+const suEmail     = document.getElementById("su-email");
+const suDevice    = document.getElementById("su-device");
+const suSubmit    = document.getElementById("su-submit");
+const suError     = document.getElementById("su-error");
+
+const signinForm  = document.getElementById("signinForm");
+const siEmail     = document.getElementById("si-email");
+const siMsg       = document.getElementById("si-msg");
+const siSubmit    = document.getElementById("si-submit");
+
+const qrLoading   = document.getElementById("qrLoading");
+const qrActive    = document.getElementById("qrActive");
+const qrExpired   = document.getElementById("qrExpired");
+const qrSuccess   = document.getElementById("qrSuccess");
+const qrImg       = document.getElementById("qrImg");
+const timerBar    = document.getElementById("timerBar");
+const btnRefresh  = document.getElementById("btnRefresh");
+
+const statusBar   = document.getElementById("statusBar");
+const statusDot   = document.getElementById("statusDot");
+const statusText  = document.getElementById("statusText");
+
+// ── State ────────────────────────────────────────────────────────────────────
+let sessionId       = null;
+let pollTimer       = null;
+let rotateTimer     = null;
+let expireTimer     = null;
+let rotateCountdown = QR_ROTATE_SECS;
+let totalElapsed    = 0;
+
+// Read OAuth params forwarded from /oauth/authorize
+const params = new URLSearchParams(window.location.search);
+const oauthPayload = {
+    client_id:    params.get("client_id")    || undefined,
+    redirect_uri: params.get("redirect_uri") || undefined,
+    scope:        params.get("scope")        || "openid profile email",
+};
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+window.setMode = function setMode(mode) {
+    const isSignup = mode === "signup";
+
+    tabSignup.className = "tab-btn" + (isSignup ? " tab-btn--active" : "");
+    tabSignin.className = "tab-btn" + (isSignup ? "" : " tab-btn--active");
+
+    formSignup.classList.toggle("hidden", !isSignup);
+    formSignin.classList.toggle("hidden",  isSignup);
+
+    hideSuError();
+    hideSiMsg();
+};
+
+// ── QR state machine ─────────────────────────────────────────────────────────
+function setQRState(state) {
+    qrLoading.classList.add("hidden");
+    qrActive.classList.add("hidden");
+    qrExpired.classList.add("hidden");
+    qrSuccess.classList.add("hidden");
+
+    switch (state) {
+        case "loading":
+            qrLoading.classList.remove("hidden");
+            setStatus("gold", "Initializing session…");
+            break;
+
+        case "active":
+            qrActive.classList.remove("hidden");
+            setStatus("gold", "Waiting for your phone to scan…");
+            break;
+
+        case "scanned":
+            qrActive.classList.remove("hidden");
+            setStatus("blue", "Phone detected — tap Approve on your device");
+            break;
+
+        case "expired":
+            clearTimers();
+            qrExpired.classList.remove("hidden");
+            setStatus("warn", "Session expired — generate a new code to continue");
+            break;
+
+        case "success":
+            clearTimers();
+            qrSuccess.classList.remove("hidden");
+            setStatus("ok", "Identity verified — signing you in…");
+            break;
     }
-    
-    // Guard: ensure form exists before proceeding
-    if (!loginForm) {
-        console.error('Login form not found');
-        return;
+}
+
+function setStatus(variant, text) {
+    const styles = {
+        gold: {
+            bg:     "rgba(196,163,90,0.07)",
+            border: "rgba(196,163,90,0.14)",
+            color:  "rgba(240,232,220,0.55)",
+            dot:    "rgba(196,163,90,0.70)",
+        },
+        blue: {
+            bg:     "rgba(80,100,200,0.09)",
+            border: "rgba(80,100,200,0.20)",
+            color:  "rgba(200,210,255,0.65)",
+            dot:    "rgba(120,140,255,0.80)",
+        },
+        ok: {
+            bg:     "rgba(109,191,138,0.09)",
+            border: "rgba(109,191,138,0.22)",
+            color:  "rgba(109,191,138,0.80)",
+            dot:    "#6dbf8a",
+        },
+        warn: {
+            bg:     "rgba(200,80,72,0.09)",
+            border: "rgba(200,80,72,0.22)",
+            color:  "#f4a8a0",
+            dot:    "#f4a8a0",
+        },
+    };
+    const s = styles[variant] || styles.gold;
+    statusBar.style.background   = s.bg;
+    statusBar.style.border       = `1px solid ${s.border}`;
+    statusBar.style.color        = s.color;
+    statusDot.style.background   = s.dot;
+    statusText.textContent       = text;
+}
+
+// ── Session creation ─────────────────────────────────────────────────────────
+async function createSession() {
+    clearTimers();
+    sessionId    = null;
+    totalElapsed = 0;
+
+    setQRState("loading");
+
+    try {
+        const body = Object.fromEntries(
+            Object.entries(oauthPayload).filter(([, v]) => v !== undefined)
+        );
+        const res = await fetch("/api/qr/sessions", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Server error");
+
+        const data = await res.json();
+        sessionId = data.session_id;
+
+        qrImg.src = data.qr_data_url;
+        setQRState("active");
+        startCountdown(data.qr_ttl || QR_ROTATE_SECS);
+        startPolling();
+
+    } catch (err) {
+        setStatus("warn", "Could not create session — " + err.message);
     }
+}
 
-    // Add event listener to form submit button
-    submitButton.addEventListener('click', async function (e) {
-        e.preventDefault();
+// ── Countdown & rotation ─────────────────────────────────────────────────────
+function startCountdown(ttl) {
+    rotateCountdown = ttl;
+    timerBar.style.width = "100%";
 
-        // Clear previous errors
-        errorContainer.textContent = '';
-        errorContainer.style.display = 'none';
-        errorContainer.className = 'mt-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-400 text-sm text-center';
+    const tick = () => {
+        rotateCountdown--;
+        totalElapsed++;
 
-        // Get input values
-        const email = emailInput.value.trim();
-        const accessKey = passwordInput.value;
+        // Visual timer bar (counts down to 0 then resets)
+        timerBar.style.width = `${Math.max(0, (rotateCountdown / ttl) * 100)}%`;
 
-        // Basic validation
-        if (!email || !accessKey) {
-            showError('Please enter both Email and Access Key');
+        // Hard session expiry (90 s total)
+        if (totalElapsed >= SESSION_EXPIRE) {
+            setQRState("expired");
             return;
         }
 
-        // Show loading state
-        submitButton.disabled = true;
-        const originalText = submitButton.innerHTML;
-        submitButton.innerHTML = '<span>Verifying...</span>';
+        if (rotateCountdown <= 0) {
+            refreshQR();
+        } else {
+            rotateTimer = setTimeout(tick, 1000);
+        }
+    };
 
-        try {
-            // Make API call to login endpoint
-            const response = await fetch('http://127.0.0.1:8000/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: email,
-                    access_key: accessKey
-                })
-            });
+    rotateTimer = setTimeout(tick, 1000);
+}
 
-            const data = await response.json();
+async function refreshQR() {
+    if (!sessionId) return;
+    try {
+        const res = await fetch(`/api/qr/sessions/${sessionId}/qr`, { credentials: "include" });
+        if (!res.ok) { setQRState("expired"); return; }
+        const data = await res.json();
+        qrImg.src = data.qr_data_url;
+        startCountdown(data.ttl || QR_ROTATE_SECS);
+    } catch {
+        setQRState("expired");
+    }
+}
 
-            if (response.ok) {
-                // Login successful - store token and check next step
-                if (data.access_token) {
-                    localStorage.setItem('access_token', data.access_token);
-                    localStorage.setItem('user_email', email);
+// ── Polling ───────────────────────────────────────────────────────────────────
+function startPolling() {
+    pollTimer = setInterval(poll, 2000);
+}
+
+async function poll() {
+    if (!sessionId) return;
+    try {
+        const res = await fetch(`/api/qr/sessions/${sessionId}/status`, { credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        switch (data.status) {
+            case "pending":
+                break;
+
+            case "scanned":
+                setQRState("scanned");
+                break;
+
+            case "approved": {
+                clearInterval(pollTimer);
+                pollTimer = null;
+                setQRState("success");
+
+                if (data.redirect_url) {
+                    setTimeout(() => { window.location.href = data.redirect_url; }, 600);
+                    return;
                 }
-                
-                if (data.next === "fingerprint") {
-                    showSuccess('Credentials verified! Proceeding to biometric...');
-                    setTimeout(() => {
-                        openFingerprint(email);
-                    }, 500);
-                } else {
-                    // Fallback if no next step specified
-                    showSuccess('Login successful!');
-                    setTimeout(() => {
-                        window.location.href = '/home';
-                    }, 1000);
-                }
 
-            } else {
-                // Login failed
-                showError(data.detail || 'Invalid credentials. Please try again.');
+                // Direct login — exchange approved session for a JWT cookie
+                try {
+                    const tok = await fetch(`/api/qr/sessions/${sessionId}/token`, {
+                        method: "POST",
+                        credentials: "include",
+                    });
+                    if (tok.ok) {
+                        setTimeout(() => { window.location.href = "/home"; }, 800);
+                    } else {
+                        setStatus("warn", "Token exchange failed — please try again");
+                    }
+                } catch {
+                    setStatus("warn", "Network error during token exchange");
+                }
+                break;
             }
-        } catch (error) {
-            console.error('Login error:', error);
-            showError('Connection error. Please check if the server is running.');
-        } finally {
-            // Restore button state
-            submitButton.disabled = false;
-            submitButton.innerHTML = originalText;
-        }
-    });
 
-    // Helper function to show error messages
-    function showError(message) {
-        errorContainer.textContent = message;
-        errorContainer.className = 'mt-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-400 text-sm text-center';
-        errorContainer.style.display = 'block';
+            case "expired":
+            case "consumed":
+                if (data.status === "expired") setQRState("expired");
+                break;
+        }
+    } catch {
+        // transient network error — keep polling
     }
+}
 
-    // Helper function to show success messages
-    function showSuccess(message) {
-        errorContainer.textContent = message;
-        errorContainer.className = 'mt-4 p-3 bg-green-500/10 border border-green-500 rounded-lg text-green-400 text-sm text-center';
-        errorContainer.style.display = 'block';
+// ── Helper: clear all timers ──────────────────────────────────────────────────
+function clearTimers() {
+    clearInterval(pollTimer);
+    clearTimeout(rotateTimer);
+    pollTimer    = null;
+    rotateTimer  = null;
+}
+
+// ── Signup form ───────────────────────────────────────────────────────────────
+function showSuError(msg) {
+    suError.textContent = msg;
+    suError.classList.remove("hidden");
+}
+function hideSuError() {
+    suError.classList.add("hidden");
+}
+
+signupForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    hideSuError();
+    suSubmit.disabled = true;
+    suSubmit.textContent = "Enrolling…";
+
+    const full_name   = suName.value.trim();
+    const email       = suEmail.value.trim();
+    const device_name = suDevice.value.trim() || "My Device";
+
+    try {
+        const res = await fetch("/api/auth/register", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ full_name, email, device_name }),
+        });
+        if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.detail || "Registration failed");
+        }
+        const data = await res.json();
+        localStorage.setItem(DEVICE_TOKEN_KEY, data.device_token);
+        window.location.href = "/home";
+
+    } catch (err) {
+        showSuError(err.message);
+        suSubmit.disabled = false;
+        suSubmit.textContent = "Enroll & Activate";
     }
-
-    // Allow Enter key to submit form
-    emailInput.addEventListener('keypress', function (e) {
-        if (e.key === 'Enter') {
-            submitButton.click();
-        }
-    });
-
-    passwordInput.addEventListener('keypress', function (e) {
-        if (e.key === 'Enter') {
-            submitButton.click();
-        }
-    });
-
-    // Password visibility toggle
-    const allButtons = document.querySelectorAll('button[type="button"]');
-    allButtons.forEach(button => {
-        const icon = button.querySelector('.material-symbols-outlined');
-        if (icon && (icon.textContent === 'visibility_off' || icon.textContent === 'visibility')) {
-            button.addEventListener('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (passwordInput.type === 'password') {
-                    passwordInput.type = 'text';
-                    icon.textContent = 'visibility';
-                } else {
-                    passwordInput.type = 'password';
-                    icon.textContent = 'visibility_off';
-                }
-            });
-        }
-    });
 });
+
+// ── Signin form ───────────────────────────────────────────────────────────────
+function showSiMsg(text, variant) {
+    const variants = {
+        ok:   { bg: "rgba(109,191,138,0.09)", border: "rgba(109,191,138,0.22)", color: "rgba(109,191,138,0.90)" },
+        info: { bg: "rgba(196,163,90,0.07)",  border: "rgba(196,163,90,0.18)",  color: "rgba(240,232,220,0.65)" },
+        err:  { bg: "rgba(200,80,72,0.09)",   border: "rgba(200,80,72,0.22)",   color: "#f4a8a0" },
+    };
+    const s = variants[variant] || variants.info;
+    siMsg.style.background = s.bg;
+    siMsg.style.border     = `1px solid ${s.border}`;
+    siMsg.style.color      = s.color;
+    siMsg.textContent      = text;
+    siMsg.classList.remove("hidden");
+}
+function hideSiMsg() {
+    siMsg.classList.add("hidden");
+}
+
+signinForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    hideSiMsg();
+    siSubmit.disabled = true;
+    siSubmit.textContent = "Checking…";
+
+    const email = siEmail.value.trim();
+
+    try {
+        const res = await fetch("/api/auth/lookup", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+        });
+
+        if (res.status === 404) {
+            showSiMsg("No account found for that email — create one using the tab above.", "err");
+            siSubmit.disabled = false;
+            siSubmit.textContent = "Continue";
+            return;
+        }
+
+        if (!res.ok) throw new Error("Lookup failed");
+
+        // Account found — check if this browser has a device token
+        const deviceToken = localStorage.getItem(DEVICE_TOKEN_KEY);
+        if (deviceToken) {
+            showSiMsg(
+                "Account found. Use your registered phone to scan the QR code on the right — then tap Approve.",
+                "ok"
+            );
+        } else {
+            showSiMsg(
+                "Account found, but this browser is not a registered device. Open Cipher on your enrolled phone and scan the QR code →",
+                "info"
+            );
+        }
+
+    } catch {
+        showSiMsg("Could not reach the server — please try again.", "err");
+    } finally {
+        siSubmit.disabled = false;
+        siSubmit.textContent = "Continue";
+    }
+});
+
+// ── Refresh button ────────────────────────────────────────────────────────────
+btnRefresh.addEventListener("click", createSession);
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+createSession();

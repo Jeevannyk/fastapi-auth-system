@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Approve login · Cipher</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #06091a; --glass: rgba(255,255,255,0.055);
+            --gold: #c4a35a; --gold-lt: #e0c07a;
+            --text: #f0e8dc; --muted: rgba(240,232,220,0.45); --subtle: rgba(240,232,220,0.22);
+            --ok: #6dbf8a; --ok-dim: rgba(109,191,138,0.12);
+            --err-bg: rgba(200,80,72,0.09); --err-bd: rgba(200,80,72,0.22); --err-tx: #f4a8a0;
+        }
+        html, body { height: 100%; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: radial-gradient(ellipse 80% 60% at 20% 110%, rgba(28,18,6,0.9) 0%, var(--bg) 60%);
+            background-color: var(--bg); color: var(--text);
+            min-height: 100vh; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 2rem 1.5rem; -webkit-font-smoothing: antialiased;
+        }
+        .orb { position: fixed; border-radius: 50%; pointer-events: none; z-index: 0; }
+        .orb-1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(109,191,138,0.18) 0%, transparent 68%); top: -100px; right: -80px; filter: blur(60px); }
+        .orb-2 { width: 360px; height: 360px; background: radial-gradient(circle, rgba(196,163,90,0.14) 0%, transparent 68%); bottom: -80px; left: -60px; filter: blur(65px); }
+        .grain { position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); opacity: 0.038; pointer-events: none; z-index: 200; }
+
+        main { position: relative; z-index: 10; width: 100%; max-width: 360px; }
+
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+        .logo    { animation: fadeUp .65s cubic-bezier(.16,1,.3,1) 0s   both; }
+        .card    { animation: fadeUp .65s cubic-bezier(.16,1,.3,1) .15s both; }
+
+        .logo { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 2rem; }
+        .logo-icon { width: 32px; height: 32px; background: linear-gradient(145deg, #b8942e, #d4b060, #c4a35a); border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1px rgba(196,163,90,0.38), 0 4px 16px rgba(196,163,90,0.28); }
+        .logo-name { font-family: 'Inter', system-ui, sans-serif; font-size: 1rem; font-weight: 700; letter-spacing: 0.02em; }
+
+        .card {
+            background: var(--glass); backdrop-filter: blur(28px) saturate(160%); -webkit-backdrop-filter: blur(28px) saturate(160%);
+            border-radius: 20px; border-top: 1px solid rgba(255,255,255,0.16);
+            border-left: 1px solid rgba(255,255,255,0.09); border-right: 1px solid rgba(255,255,255,0.07);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            box-shadow: 0 8px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
+            padding: 1.75rem;
+        }
+
+        .state { display: none; }
+        .state.active { display: block; }
+
+        /* Loading */
+        .loader { display: flex; justify-content: center; padding: 1.5rem 0; }
+        .spinner { width: 32px; height: 32px; border: 2.5px solid rgba(255,255,255,0.1); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.9s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* User info */
+        .user-avatar { width: 56px; height: 56px; background: linear-gradient(135deg, rgba(196,163,90,0.2), rgba(196,163,90,0.05)); border: 1px solid rgba(196,163,90,0.25); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Inter', system-ui, sans-serif; font-size: 1.25rem; font-weight: 600; color: var(--gold-lt); margin: 0 auto 1rem; }
+        .user-name { font-family: 'Inter', system-ui, sans-serif; font-size: 1.25rem; font-weight: 600; text-align: center; color: var(--text); margin-bottom: 0.25rem; }
+        .user-email { font-size: 0.8125rem; color: var(--muted); text-align: center; margin-bottom: 1.5rem; }
+
+        .login-details { background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 0.875rem 1rem; margin-bottom: 1.5rem; }
+        .login-details p { font-size: 0.775rem; color: var(--muted); line-height: 1.7; }
+        .login-details strong { color: var(--text); font-weight: 400; }
+
+        .btn-approve {
+            width: 100%; padding: 0.85rem;
+            background: linear-gradient(110deg, #2d6b4a 0%, #3d8f62 40%, #4aab76 60%, #3d8f62 80%, #2d6b4a 100%);
+            background-size: 200% 100%; background-position: 0% 0%;
+            color: #e8f5ee; border: none; border-radius: 12px;
+            font-size: 0.875rem; font-weight: 500; font-family: 'Inter', system-ui, sans-serif;
+            letter-spacing: 0.04em; cursor: pointer; margin-bottom: 0.75rem;
+            transition: background-position .5s ease, transform .12s;
+            box-shadow: 0 2px 20px rgba(60,140,90,0.28), inset 0 1px 0 rgba(255,255,255,0.18);
+        }
+        .btn-approve:hover  { background-position: 100% 0%; }
+        .btn-approve:active { transform: scale(0.99); }
+        .btn-approve:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .btn-deny {
+            width: 100%; padding: 0.75rem;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09);
+            border-radius: 12px; color: var(--muted); font-size: 0.8125rem;
+            font-family: 'Inter', system-ui, sans-serif; cursor: pointer; transition: background .2s, color .2s;
+        }
+        .btn-deny:hover { background: rgba(200,80,72,0.09); border-color: rgba(200,80,72,0.22); color: var(--err-tx); }
+
+        /* Success / Error */
+        .result-icon { font-size: 2.5rem; text-align: center; margin-bottom: 0.875rem; }
+        .result-title { font-family: 'Inter', system-ui, sans-serif; font-size: 1.5rem; font-weight: 700; text-align: center; margin-bottom: 0.5rem; }
+        .result-msg { font-size: 0.8125rem; color: var(--muted); text-align: center; line-height: 1.6; }
+
+        /* No device */
+        .enroll-cta { margin-top: 1.25rem; text-align: center; }
+        .enroll-cta a { color: var(--gold-lt); text-decoration: none; font-size: 0.875rem; }
+    </style>
+</head>
+<body>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="orb orb-1" aria-hidden="true"></div>
+    <div class="orb orb-2" aria-hidden="true"></div>
+
+    <main>
+        <div class="logo">
+            <div class="logo-icon">
+                <svg width="16" height="18" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+                    <path d="M9 2L17 18H1L9 2Z" fill="none" stroke="rgba(255,255,255,0.94)" stroke-width="1.5" stroke-linejoin="round"/>
+                    <line x1="4.5" y1="13.5" x2="13.5" y2="13.5" stroke="rgba(255,255,255,0.72)" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <span class="logo-name">Cipher</span>
+        </div>
+
+        <div class="card">
+            <!-- Loading -->
+            <div class="state active" id="stateLoading">
+                <div class="loader"><div class="spinner"></div></div>
+            </div>
+
+            <!-- Approve / deny -->
+            <div class="state" id="stateApprove">
+                <div class="user-avatar" id="avatar"></div>
+                <p class="user-name" id="userName"></p>
+                <p class="user-email" id="userEmail"></p>
+                <div class="login-details">
+                    <p>A sign-in attempt was detected on a <strong>new browser or device</strong>. Approve only if you initiated this.</p>
+                </div>
+                <button class="btn-approve" id="btnApprove">Approve sign-in</button>
+                <button class="btn-deny" id="btnDeny">Deny — this wasn't me</button>
+            </div>
+
+            <!-- Success -->
+            <div class="state" id="stateSuccess">
+                <div class="result-icon">✓</div>
+                <p class="result-title" style="color:var(--ok)">Approved</p>
+                <p class="result-msg">The sign-in has been authorized. You can close this tab.</p>
+            </div>
+
+            <!-- Denied -->
+            <div class="state" id="stateDenied">
+                <div class="result-icon" style="color:var(--err-tx)">✕</div>
+                <p class="result-title" style="color:var(--err-tx)">Denied</p>
+                <p class="result-msg">The sign-in attempt was blocked.</p>
+            </div>
+
+            <!-- No device registered -->
+            <div class="state" id="stateNoDevice">
+                <div class="result-icon">⚠</div>
+                <p class="result-title">Not enrolled</p>
+                <p class="result-msg">This device isn't registered with Cipher. Register first, then scan again.</p>
+                <div class="enroll-cta"><a href="/register">Register this device →</a></div>
+            </div>
+
+            <!-- Error -->
+            <div class="state" id="stateError">
+                <div class="result-icon" style="color:var(--err-tx)">!</div>
+                <p class="result-title" style="color:var(--err-tx)">Something went wrong</p>
+                <p class="result-msg" id="errorMsg"></p>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="/static/scan.js"></script>
+</body>
+</html>
