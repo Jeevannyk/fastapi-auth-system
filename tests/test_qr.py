@@ -78,7 +78,7 @@ def test_create_session_rejects_unknown_scope(client):
 def test_state_change_without_csrf_is_rejected(client):
     register(client)  # client now carries the device cookie
     sid = create_session(client).json()["session_id"]
-    # Approve carrying the device cookie but no CSRF header → 403.
+    # POST /scan carrying the device cookie but no CSRF header → 403.
     r = client.post(f"/api/qr/sessions/{sid}/scan", json={"timestamp": 0, "sig": "x"})
     assert r.status_code == 403
 
@@ -90,15 +90,12 @@ def test_scan_without_device_cookie_is_unauthorized(client):
     sid = create_session(sid_owner).json()["session_id"]
 
     bare = TestClient(app)
-    # Prime a csrf cookie so CSRF passes and we reach the auth check.
-    bare.get("/login")
-    ts_sig = csrf(bare)
+    # No device cookie present → CSRF is skipped entirely, so the request
+    # reaches device auth, which fails.
     r = bare.post(
         f"/api/qr/sessions/{sid}/scan",
         json={"timestamp": 0, "sig": "x"},
-        headers=ts_sig,
     )
-    # No device cookie present → CSRF skipped, device auth fails.
     assert r.status_code == 401
 
 
