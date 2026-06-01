@@ -1,7 +1,9 @@
 // Reads QR params from the URL, validates the challenge, then shows approve/deny UI.
-// The device token is stored in localStorage under "cipher_device_token".
+// Device authentication rides on the HttpOnly "device_token" cookie set at
+// enrollment — JS never sees the token. State-changing calls carry the CSRF
+// token from the readable "csrf_token" cookie.
 
-const DEVICE_TOKEN_KEY = "cipher_device_token";
+import { getCookie, withCsrf } from "/static/util.js";
 
 const states = {
     loading:  document.getElementById("stateLoading"),
@@ -36,31 +38,26 @@ if (!sessionId || !timestamp || !sig) {
 }
 
 async function init() {
-    const deviceToken = localStorage.getItem(DEVICE_TOKEN_KEY);
-    if (!deviceToken) { show("noDevice"); return; }
+    // No readable device token anymore — detect enrollment via the flag cookie.
+    if (!getCookie("device_enrolled")) { show("noDevice"); return; }
 
-    // 1. Scan — identify user and mark session as scanned
+    // 1. Scan — identify user and mark session as scanned (device cookie auth)
     const scanRes = await fetch(`/api/qr/sessions/${sessionId}/scan`, {
         method: "POST",
         credentials: "include",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${deviceToken}`,
-        },
+        headers: withCsrf("POST", { "Content-Type": "application/json" }),
         body: JSON.stringify({ timestamp, sig }),
     });
 
     if (!scanRes.ok) {
+        if (scanRes.status === 401) { show("noDevice"); return; }
         const err = await scanRes.json().catch(() => ({}));
         setError(err.detail || "QR code is invalid or has expired. Please ask for a new one.");
         return;
     }
 
     // 2. Identify who this device belongs to
-    const meRes = await fetch("/api/devices/me", {
-        credentials: "include",
-        headers: { "Authorization": `Bearer ${deviceToken}` },
-    });
+    const meRes = await fetch("/api/devices/me", { credentials: "include" });
 
     if (!meRes.ok) { setError("Could not identify device user."); return; }
     const user = await meRes.json();
@@ -72,18 +69,18 @@ async function init() {
     document.getElementById("userEmail").textContent = user.email;
     show("approve");
 
-    document.getElementById("btnApprove").addEventListener("click", () => approve(deviceToken));
-    document.getElementById("btnDeny").addEventListener("click", () => deny(deviceToken));
+    document.getElementById("btnApprove").addEventListener("click", approve);
+    document.getElementById("btnDeny").addEventListener("click", deny);
 }
 
-async function approve(deviceToken) {
+async function approve() {
     document.getElementById("btnApprove").disabled = true;
     document.getElementById("btnDeny").disabled = true;
 
     const res = await fetch(`/api/qr/sessions/${sessionId}/approve`, {
         method: "POST",
         credentials: "include",
-        headers: { "Authorization": `Bearer ${deviceToken}` },
+        headers: withCsrf("POST"),
     });
 
     if (res.ok) {
@@ -94,11 +91,11 @@ async function approve(deviceToken) {
     }
 }
 
-async function deny(deviceToken) {
+async function deny() {
     await fetch(`/api/qr/sessions/${sessionId}/deny`, {
         method: "POST",
         credentials: "include",
-        headers: { "Authorization": `Bearer ${deviceToken}` },
+        headers: withCsrf("POST"),
     });
     show("denied");
 }

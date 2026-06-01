@@ -11,6 +11,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from .config import get_settings
+from .csrf import CSRFMiddleware
 from .deps import current_user
 from .models import User
 from .rate_limit import limiter
@@ -36,9 +37,11 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-CSRF-Token"],
     )
+
+    app.add_middleware(CSRFMiddleware, cookie_secure=settings.cookie_secure)
 
     if settings.is_production:
         app.add_middleware(HTTPSRedirectMiddleware)

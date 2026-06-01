@@ -1,7 +1,12 @@
-const DEVICE_TOKEN_KEY = "cipher_device_token";
+import { getCookie, withCsrf } from "/static/util.js";
 
 async function api(path, options = {}) {
-    const res = await fetch(path, { credentials: "include", ...options });
+    const method = options.method || "GET";
+    const res = await fetch(path, {
+        credentials: "include",
+        ...options,
+        headers: withCsrf(method, options.headers || {}),
+    });
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
     return res.status === 204 ? null : res.json();
 }
@@ -111,24 +116,20 @@ window.revokeDevice = async (id) => {
 loadDevices();
 
 // ── Add device ────────────────────────────────────────────────────────────────
-const deviceToken = localStorage.getItem(DEVICE_TOKEN_KEY);
-
 document.getElementById("btnAddDevice").addEventListener("click", async () => {
-    if (!deviceToken) {
-        alert("No device token in this browser. Register at /register first.");
+    if (!getCookie("device_enrolled")) {
+        alert("This browser is not enrolled. Register at /register first.");
         return;
     }
     const name = prompt("Name for the new device:", "New Device");
     if (!name) return;
     try {
-        const res = await fetch(`/api/devices/enroll?device_name=${encodeURIComponent(name)}`, {
+        // Authenticated by the HttpOnly device_token cookie; the returned raw
+        // token is for transferring to the new device, not stored here.
+        const d = await api(`/api/devices/enroll?device_name=${encodeURIComponent(name)}`, {
             method: "POST",
-            credentials: "include",
-            headers: { "Authorization": `Bearer ${deviceToken}` },
         });
-        if (!res.ok) throw new Error((await res.json()).detail);
-        const d = await res.json();
-        localStorage.setItem(DEVICE_TOKEN_KEY, d.device_token);
+        prompt("New device token (copy it onto the new device):", d.device_token);
         loadDevices();
     } catch (err) {
         alert("Failed: " + err.message);

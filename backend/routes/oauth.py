@@ -23,13 +23,17 @@ from ..database import get_db
 from ..deps import current_user
 from ..models import OAuthClient, QRSession, User
 from ..schemas import MessageResponse, OAuthTokenResponse, UserResponse
-from ..security import create_access_token, hash_token
+from ..security import (
+    OIDC_SCOPES,
+    create_access_token,
+    hash_token,
+    redirect_uri_allowed,
+    validate_scope,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/oauth", tags=["oauth"])
 settings = get_settings()
-
-OIDC_SCOPES = {"openid", "profile", "email"}
 
 
 # ── OIDC Discovery ───────────────────────────────────────────────────────────
@@ -70,8 +74,13 @@ def authorize(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown client_id")
 
     allowed = [u.strip() for u in client.redirect_uris.split(",")]
-    if redirect_uri not in allowed:
+    if not redirect_uri_allowed(redirect_uri, allowed):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "redirect_uri not allowed")
+
+    try:
+        validate_scope(scope)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
 
     params = urlencode({
         "client_id": client_id,
@@ -113,7 +122,9 @@ def token(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or already-used code")
     if session.auth_code_expires_at and session.auth_code_expires_at < datetime.now(timezone.utc):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Authorization code expired")
-    if session.client_id != client_id:
+    # A direct-login (non-OAuth) session has no client_id — reject it outright
+    # rather than relying on a None-vs-string comparison to fall through.
+    if not session.client_id or session.client_id != client_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "code was not issued for this client")
     if session.redirect_uri != redirect_uri:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "redirect_uri mismatch")

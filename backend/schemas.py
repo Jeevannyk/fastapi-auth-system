@@ -13,7 +13,6 @@ class RegisterRequest(BaseModel):
 
 class RegisterResponse(BaseModel):
     user_id: int
-    device_token: str
     message: str
 
 

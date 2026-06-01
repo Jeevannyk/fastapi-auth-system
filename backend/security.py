@@ -6,6 +6,7 @@ import secrets
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Literal
+from urllib.parse import urlparse
 
 import qrcode
 import qrcode.image.pure
@@ -17,6 +18,42 @@ settings = get_settings()
 ALGORITHM = "HS256"
 
 TokenType = Literal["access"]
+
+# Scopes this identity provider understands. Any requested scope outside this
+# set is rejected before a session is ever created.
+OIDC_SCOPES = {"openid", "profile", "email"}
+
+
+def validate_scope(scope: str) -> set[str]:
+    """Parse a space-delimited scope string and ensure every scope is known.
+
+    Returns the parsed scope set. Raises ValueError if any scope is unknown or
+    the string is empty.
+    """
+    requested = {s for s in scope.split() if s}
+    if not requested:
+        raise ValueError("scope must not be empty")
+    unknown = requested - OIDC_SCOPES
+    if unknown:
+        raise ValueError(f"unsupported scope(s): {', '.join(sorted(unknown))}")
+    return requested
+
+
+def redirect_uri_allowed(uri: str, allowed: list[str]) -> bool:
+    """Validate a redirect URI against an exact-match allow-list.
+
+    Beyond exact matching we also require an http/https scheme and a network
+    location, which blocks ``javascript:``/``data:`` and other open-redirect
+    vectors even if a malformed entry slips into the allow-list.
+    """
+    if uri not in allowed:
+        return False
+    parsed = urlparse(uri)
+    if parsed.scheme not in ("http", "https"):
+        return False
+    if not parsed.netloc:
+        return False
+    return True
 
 
 # ── JWT access tokens ────────────────────────────────────────────────────────

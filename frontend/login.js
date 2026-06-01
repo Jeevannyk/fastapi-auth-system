@@ -1,7 +1,17 @@
 // ── Constants ────────────────────────────────────────────────────────────────
-const DEVICE_TOKEN_KEY = "cipher_device_token";
 const QR_ROTATE_SECS   = 30;   // refresh QR image every 30 s
 const SESSION_EXPIRE   = 90;   // show expired overlay after 90 s
+
+// ── Cookie / CSRF helpers ──────────────────────────────────────────────────────
+function getCookie(name) {
+    const match = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+    return match ? decodeURIComponent(match[1]) : null;
+}
+// Attach the CSRF token (double-submit cookie) to state-changing requests.
+function csrfHeaders(extra = {}) {
+    const token = getCookie("csrf_token");
+    return token ? { ...extra, "X-CSRF-Token": token } : { ...extra };
+}
 
 // ── Element refs ─────────────────────────────────────────────────────────────
 const tabSignup   = document.getElementById("tabSignup");
@@ -150,7 +160,7 @@ async function createSession() {
         const res = await fetch("/api/qr/sessions", {
             method: "POST",
             credentials: "include",
-            headers: { "Content-Type": "application/json" },
+            headers: csrfHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify(body),
         });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Server error");
@@ -244,6 +254,7 @@ async function poll() {
                     const tok = await fetch(`/api/qr/sessions/${sessionId}/token`, {
                         method: "POST",
                         credentials: "include",
+                        headers: csrfHeaders(),
                     });
                     if (tok.ok) {
                         setTimeout(() => { window.location.href = "/home"; }, 800);
@@ -297,15 +308,15 @@ signupForm.addEventListener("submit", async (e) => {
         const res = await fetch("/api/auth/register", {
             method: "POST",
             credentials: "include",
-            headers: { "Content-Type": "application/json" },
+            headers: csrfHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({ full_name, email, device_name }),
         });
         if (!res.ok) {
             const body = await res.json().catch(() => ({}));
             throw new Error(body.detail || "Registration failed");
         }
-        const data = await res.json();
-        localStorage.setItem(DEVICE_TOKEN_KEY, data.device_token);
+        await res.json();
+        // Device token is now an HttpOnly cookie set by the server.
         window.location.href = "/home";
 
     } catch (err) {
@@ -345,7 +356,7 @@ signinForm.addEventListener("submit", async (e) => {
         const res = await fetch("/api/auth/lookup", {
             method: "POST",
             credentials: "include",
-            headers: { "Content-Type": "application/json" },
+            headers: csrfHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({ email }),
         });
 
@@ -358,9 +369,9 @@ signinForm.addEventListener("submit", async (e) => {
 
         if (!res.ok) throw new Error("Lookup failed");
 
-        // Account found — check if this browser has a device token
-        const deviceToken = localStorage.getItem(DEVICE_TOKEN_KEY);
-        if (deviceToken) {
+        // Account found — check if this browser is an enrolled device
+        const enrolled = getCookie("device_enrolled");
+        if (enrolled) {
             showSiMsg(
                 "Account found. Use your registered phone to scan the QR code on the right — then tap Approve.",
                 "ok"
