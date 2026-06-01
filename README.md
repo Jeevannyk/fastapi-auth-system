@@ -1,26 +1,42 @@
 # Cipher Auth
 
-A production-shaped FastAPI authentication service. Cookie-based sessions, refresh-token rotation, TOTP two-factor, email verification, password reset, account lockout, rate limiting, Alembic migrations, and a Postgres-ready Docker setup.
+A passwordless identity provider built with FastAPI. Users enroll a trusted
+**device**, then sign in by scanning a rotating **QR code** and tapping
+*Approve* — no passwords anywhere. Cipher can also act as an OAuth 2.0 / OpenID
+Connect provider so third-party apps can "Sign in with Cipher".
 
 ## Stack
 
 - FastAPI + Pydantic v2 + pydantic-settings
 - SQLAlchemy 2.x + Alembic
-- bcrypt, python-jose (JWT), pyotp (TOTP), qrcode
+- python-jose (JWT access tokens), qrcode + pypng (QR generation)
 - slowapi for rate limiting
 - SQLite for local dev, Postgres for prod (psycopg 3)
 - Vanilla JS frontend (no build step)
 
 ## Auth model
 
-- **Access tokens** — short-lived JWT in an `HttpOnly SameSite=Lax` cookie at path `/`. 15 min default.
-- **Refresh tokens** — opaque random tokens; only their SHA-256 hash lives in the database. Stored in a separate `HttpOnly` cookie scoped to `/api/auth`. On `/refresh`, the old token is revoked and a new one is issued (rotation).
-- **Email verification** — new accounts receive a 24-hour verification link. Set `EMAIL_ENABLED=false` (default) to skip in dev; auto-verifies immediately. Unverified accounts cannot log in.
-- **Password reset** — time-limited (1 hour) reset links sent by email. Always returns a generic success message to prevent email enumeration. Resets the account lockout on success.
-- **2FA / TOTP** — RFC 6238. When enabled, `/login` returns `requires_2fa: true` and sets a short-lived `pending_2fa` cookie. The client posts a 6-digit code to `/login/2fa` to finalize. QR code generated server-side.
-- **Lockout** — after 5 failed logins the account locks for 15 minutes (configurable).
-- **Rate limiting** — `5/minute` on `/login`, `3/minute` on `/signup` (per IP, configurable).
-- **HTTPS enforcement** — when `ENVIRONMENT=production`, HTTP requests are automatically redirected to HTTPS.
+- **Device enrollment** — registering a browser issues an opaque device token.
+  Only its SHA-256 hash is stored; the raw token is delivered as an `HttpOnly
+  SameSite=Lax` cookie, so it is never exposed to JavaScript (no `localStorage`).
+  A separate readable `device_enrolled` flag lets the UI know the browser is
+  enrolled without revealing the token.
+- **QR login** — the login page opens a session and shows a QR code carrying an
+  HMAC-signed, time-limited challenge that rotates every 30 s. The enrolled
+  device scans it (`/scan`), the server validates the challenge, and the user
+  taps *Approve*. The browser polls session status and exchanges the approved
+  session for a short-lived JWT access token in an `HttpOnly` cookie.
+- **CSRF** — cookie-authenticated state-changing requests are protected with a
+  double-submit token: a readable `csrf_token` cookie echoed back in the
+  `X-CSRF-Token` header. Requests with no auth cookie (public + server-to-server
+  OAuth calls) are exempt.
+- **OAuth 2.0 / OIDC** — `/oauth/authorize` drives the QR login scoped to a
+  registered client; after approval a one-time authorization code is delivered
+  to the client's exact-match `redirect_uri`, then exchanged at `/oauth/token`.
+  Scopes are validated against `{openid, profile, email}`.
+- **Rate limiting** — configurable per-IP limits via slowapi.
+- **HTTPS enforcement** — when `ENVIRONMENT=production`, HTTP requests are
+  redirected to HTTPS.
 
 ## Quick start (local)
 
@@ -46,37 +62,29 @@ docker compose up --build
 
 Postgres + the app start together; migrations run automatically on startup.
 
-## Email setup
-
-By default `EMAIL_ENABLED=false` — users are verified instantly and no SMTP server is needed. To enable real emails:
-
-```env
-EMAIL_ENABLED=true
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=user@example.com
-SMTP_PASSWORD=your-password
-SMTP_FROM=noreply@cipher.app
-APP_BASE_URL=https://your-domain.com
-```
-
 ## API
 
-| Method | Path                        | Notes                                              |
-| ------ | --------------------------- | -------------------------------------------------- |
-| POST   | `/api/auth/signup`          | `{full_name, email, password}` → 201               |
-| GET    | `/api/auth/verify-email`    | `?token=xxx` — activates account                   |
-| POST   | `/api/auth/login`           | Sets cookies; may return `requires_2fa: true`      |
-| POST   | `/api/auth/login/2fa`       | `{user_id, code}` — completes 2FA login            |
-| POST   | `/api/auth/refresh`         | Rotates refresh + access cookies                   |
-| POST   | `/api/auth/logout`          | Revokes refresh token, clears cookies              |
-| GET    | `/api/auth/me`              | Current user (requires auth)                       |
-| POST   | `/api/auth/forgot-password` | `{email}` — sends reset link if registered        |
-| POST   | `/api/auth/reset-password`  | `{token, password}` — sets new password            |
-| POST   | `/api/2fa/setup`            | Returns secret + otpauth URL + QR code data URL    |
-| POST   | `/api/2fa/enable`           | Confirms with a TOTP code                          |
-| POST   | `/api/2fa/disable`          | Confirms with a TOTP code                          |
-| GET    | `/health`                   | Liveness check                                     |
+| Method | Path                                  | Notes                                                       |
+| ------ | ------------------------------------- | ----------------------------------------------------------- |
+| POST   | `/api/auth/register`                  | `{full_name, email, device_name}` → enrolls device (cookie) |
+| POST   | `/api/auth/lookup`                    | `{email}` — is this email registered?                       |
+| GET    | `/api/auth/me`                        | Current user (JWT access cookie required)                   |
+| POST   | `/api/qr/sessions`                    | Open a QR login session                                     |
+| GET    | `/api/qr/sessions/{id}/qr`            | Fetch a freshly-rotated QR image                            |
+| GET    | `/api/qr/sessions/{id}/status`        | Poll session lifecycle (browser long-polls)                 |
+| POST   | `/api/qr/sessions/{id}/scan`          | Device validates the QR challenge (device cookie)           |
+| POST   | `/api/qr/sessions/{id}/approve`       | Device approves the login (device cookie)                   |
+| POST   | `/api/qr/sessions/{id}/deny`          | Device rejects the login (device cookie)                    |
+| POST   | `/api/qr/sessions/{id}/token`         | Browser exchanges approved session for a JWT cookie         |
+| GET    | `/api/devices`                        | List the user's trusted devices (JWT)                       |
+| POST   | `/api/devices/enroll`                 | Provision an additional device (device cookie)              |
+| DELETE | `/api/devices/{id}`                   | Revoke a device (JWT)                                       |
+| GET    | `/api/devices/me`                     | User behind the presented device token                      |
+| GET    | `/oauth/authorize`                    | OAuth 2.0 authorization endpoint                            |
+| POST   | `/oauth/token`                        | Exchange authorization code for an access token             |
+| GET    | `/oauth/userinfo`                     | OIDC userinfo (JWT access token)                            |
+| GET    | `/oauth/.well-known/openid-configuration` | OIDC discovery document                                 |
+| GET    | `/health`                             | Liveness check                                              |
 
 ## Tests
 
@@ -84,21 +92,23 @@ APP_BASE_URL=https://your-domain.com
 pytest
 ```
 
-The suite uses a throwaway SQLite file and covers:
+The suite uses a throwaway SQLite database and covers:
 
-- Signup / login / refresh / logout / cookie handling
-- Email verification flow (valid token, expired token, single-use enforcement)
-- Password reset flow (valid token, expired token, lockout cleared, single-use enforcement)
-- Anti-enumeration (forgot-password returns identical response for any email)
-- TOTP setup + enforced 2FA login
-- Account lockout after failed attempts
+- Device enrollment (token delivered only as an HttpOnly cookie, never in the body)
+- Email lookup and the authenticated `/api/auth/me`
+- The full QR login lifecycle: create → scan → approve → token exchange
+- QR challenge validation and single-use sessions
+- CSRF enforcement on cookie-authenticated state changes
+- Scope and redirect-URI validation
+- The OAuth authorization-code flow end to end (including rejection of
+  direct-login codes at the token endpoint)
+- Security primitives: JWT round-trips, opaque-token hashing, QR challenge HMAC
 
 ## Production checklist
 
 - Set `ENVIRONMENT=production`, a real `SECRET_KEY`, and `DATABASE_URL` pointing to Postgres.
 - Terminate TLS in front of the app; set `COOKIE_SECURE=true`.
-- Set `EMAIL_ENABLED=true` and configure SMTP credentials.
-- Set `APP_BASE_URL` to the public HTTPS URL (used in verification/reset links).
+- Set `APP_BASE_URL` to the public HTTPS URL (used to build QR scan URLs and OIDC metadata).
 - Restrict `ALLOWED_ORIGINS` to the actual frontend origin.
 - Run `alembic upgrade head` on deploy.
 - The default rate-limit backend is in-memory; for multi-process deployments point slowapi at Redis.
@@ -109,26 +119,25 @@ The suite uses a throwaway SQLite file and covers:
 backend/
   config.py        settings (pydantic-settings)
   database.py      engine, session, declarative Base
-  models.py        User, RefreshToken
+  models.py        User, RegisteredDevice, QRSession, OAuthClient
   schemas.py       request/response models
-  security.py      hashing, JWT, TOTP, QR code generation
-  email.py         SMTP email sending (verification + reset)
-  deps.py          current_user dependency
+  security.py      JWT, opaque tokens, QR challenge signing, scope/redirect validation
+  deps.py          current_user (JWT) + current_device (cookie/bearer) dependencies
+  csrf.py          double-submit CSRF middleware
   rate_limit.py    slowapi limiter
   routes/
-    auth.py        signup/login/refresh/logout/me/verify-email/forgot-password/reset-password
-    twofa.py       setup/enable/disable
+    auth.py        register / lookup
+    qr.py          QR session lifecycle (create/scan/approve/deny/token)
+    devices.py     list / enroll / revoke / me
+    oauth.py       OAuth 2.0 / OIDC endpoints
     pages.py       HTML page routes
   main.py          app factory
 frontend/
-  login.html / login.js
-  signup.html / signup.js
-  home.html / home.js
-  totp.html / totp.js
-  verify-email.html / verify-email.js
-  forgot-password.html / forgot-password.js
-  reset-password.html / reset-password.js
-  util.js          shared fetch + error helpers
+  login.html / login.js          QR login + enrollment
+  register.html / register.js     device enrollment
+  scan.html / scan.js             device-side scan & approve
+  home.html / home.js             account + device management
+  util.js                         shared fetch + CSRF helpers
 alembic/           migrations
 tests/             pytest suite
 ```

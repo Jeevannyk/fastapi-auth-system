@@ -36,7 +36,7 @@ def upgrade() -> None:
         sa.Column("email", sa.String(254), nullable=False),
         sa.Column("full_name", sa.String(120), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
     )
     op.create_index("ix_users_id", "users", ["id"], unique=False)
     op.create_index("ix_users_email", "users", ["email"], unique=True)
@@ -49,7 +49,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String(120), nullable=False, server_default="My Device"),
         sa.Column("token_hash", sa.String(64), nullable=False),
         sa.Column("last_used_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
     )
     op.create_index("ix_registered_devices_user_id", "registered_devices", ["user_id"])
     op.create_index("ix_registered_devices_token_hash", "registered_devices", ["token_hash"], unique=True)
@@ -67,7 +67,7 @@ def upgrade() -> None:
         sa.Column("auth_code_hash", sa.String(64), nullable=True),
         sa.Column("auth_code_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
     )
     op.create_index("ix_qr_sessions_session_id", "qr_sessions", ["session_id"], unique=True)
     op.create_index("ix_qr_sessions_user_id", "qr_sessions", ["user_id"])
@@ -82,7 +82,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String(120), nullable=False),
         sa.Column("redirect_uris", sa.Text(), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
     )
     op.create_index("ix_oauth_clients_client_id", "oauth_clients", ["client_id"], unique=True)
 
@@ -109,7 +109,7 @@ def downgrade() -> None:
         sa.Column("reset_token_expires", sa.DateTime(timezone=True), nullable=True),
         sa.Column("failed_login_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("locked_until", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
     )
     op.create_table(
         "refresh_tokens",
@@ -118,5 +118,5 @@ def downgrade() -> None:
         sa.Column("token_hash", sa.String(255), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
     )

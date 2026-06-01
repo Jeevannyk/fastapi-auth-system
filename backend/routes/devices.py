@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..deps import current_user, device_from_bearer
+from ..deps import current_device, current_user
 from ..models import RegisteredDevice, User
-from ..schemas import DeviceResponse, MessageResponse, RegisterRequest, UserResponse
+from ..schemas import DeviceResponse, MessageResponse, UserResponse
 from ..security import new_opaque_token
 
 logger = logging.getLogger(__name__)
@@ -22,10 +22,15 @@ def list_devices(user: User = Depends(current_user), db: Session = Depends(get_d
 @router.post("/enroll", response_model=dict)
 def enroll_additional_device(
     device_name: str = "New Device",
-    device: RegisteredDevice = Depends(device_from_bearer),
+    device: RegisteredDevice = Depends(current_device),
     db: Session = Depends(get_db),
 ):
-    """Add a second trusted device. Requires an existing device token to authorize."""
+    """Add a second trusted device. Requires an existing device token to authorize.
+
+    The raw token is returned in the body here (unlike registration) because
+    this endpoint is meant for programmatic/secondary-device provisioning by an
+    already-trusted caller, not the public browser flow.
+    """
     raw_token, token_hash = new_opaque_token()
     new_device = RegisteredDevice(
         user_id=device.user_id,
@@ -57,6 +62,6 @@ def revoke_device(
 
 
 @router.get("/me", response_model=UserResponse)
-def whoami(device: RegisteredDevice = Depends(device_from_bearer), db: Session = Depends(get_db)):
+def whoami(device: RegisteredDevice = Depends(current_device), db: Session = Depends(get_db)):
     """Return the user associated with the presented device token."""
     return UserResponse.model_validate(device.user)

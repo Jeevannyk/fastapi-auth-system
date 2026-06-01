@@ -1,11 +1,13 @@
-const DEVICE_TOKEN_KEY = "cipher_device_token";
+import { getCookie } from "/static/util.js";
 
 const form     = document.getElementById("form");
 const submit   = document.getElementById("submit");
 const errorBox = document.getElementById("error");
 
-// If already enrolled, skip to login
-if (localStorage.getItem(DEVICE_TOKEN_KEY)) {
+// If this browser is already enrolled, skip to login. The device token itself
+// lives in an HttpOnly cookie we can't read; we detect enrollment via the
+// readable "device_enrolled" flag cookie instead.
+if (getCookie("device_enrolled")) {
     window.location.href = "/login";
 }
 
@@ -31,10 +33,9 @@ form.addEventListener("submit", async (e) => {
             throw new Error(body.detail || "Registration failed");
         }
 
-        const data = await res.json();
-
-        // Persist the device token — this is the only time it is ever sent
-        localStorage.setItem(DEVICE_TOKEN_KEY, data.device_token);
+        await res.json();
+        // The device token was set server-side as an HttpOnly cookie — nothing
+        // sensitive to store in the browser.
 
         // Show success state
         document.querySelector(".heading h1").textContent = "Device enrolled";

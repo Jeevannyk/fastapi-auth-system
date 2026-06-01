@@ -87,7 +87,11 @@ class QRSession(Base):
     redirect_uri = Column(String(512), nullable=True)
     scope = Column(String(255), nullable=False, default="openid profile email")
 
-    # One-time authorization code (post-approval, OAuth code exchange)
+    # One-time authorization code (post-approval, OAuth code exchange).
+    # Only the hash is used to verify the code at the token endpoint. The raw
+    # code lives here transiently so the browser poll can hand it to the OAuth
+    # client exactly once; it is cleared the moment it is delivered.
+    auth_code = Column(String(128), nullable=True)
     auth_code_hash = Column(String(64), nullable=True, unique=True, index=True)
     auth_code_expires_at = Column(UTCDateTime(), nullable=True)
 

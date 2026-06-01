@@ -1,5 +1,3 @@
-from datetime import datetime, timezone
-
 from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
@@ -8,6 +6,7 @@ from .models import RegisteredDevice, User
 from .security import decode_access_token, hash_token
 
 ACCESS_COOKIE = "access_token"
+DEVICE_COOKIE = "device_token"
 
 
 def current_user(request: Request, db: Session = Depends(get_db)) -> User:
@@ -25,18 +24,30 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> User:
     return user
 
 
-def device_from_bearer(
+def current_device(
+    request: Request,
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> RegisteredDevice:
-    """Bearer device token from Authorization header → RegisteredDevice (with user loaded)."""
-    if not authorization or not authorization.startswith("Bearer "):
+    """Resolve the calling device from its token → RegisteredDevice.
+
+    The token is read from the HttpOnly ``device_token`` cookie (browser flow,
+    not exposed to JavaScript) and falls back to an ``Authorization: Bearer``
+    header for programmatic API clients.
+
+    This dependency is read-only — it never writes ``last_used_at`` or commits.
+    The "device was used" timestamp is recorded by the endpoint *after* the
+    operation succeeds, so a failed call (e.g. a bad QR challenge) does not
+    leave a usage trail and there is no half-applied transaction.
+    """
+    raw = request.cookies.get(DEVICE_COOKIE)
+    if not raw and authorization and authorization.startswith("Bearer "):
+        raw = authorization.split(" ", 1)[1]
+    if not raw:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Device token required")
-    raw = authorization.split(" ", 1)[1]
+
     token_hash = hash_token(raw)
     device = db.query(RegisteredDevice).filter(RegisteredDevice.token_hash == token_hash).first()
     if not device:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Unrecognized device token")
-    device.last_used_at = datetime.now(timezone.utc)
-    db.commit()
     return device
