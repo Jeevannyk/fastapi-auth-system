@@ -378,7 +378,7 @@ signinForm.addEventListener("submit", async (e) => {
             );
         } else {
             showSiMsg(
-                "Account found, but this browser is not a registered device. Open Cipher on your enrolled phone and scan the QR code →",
+                "Account found. Open your QR code scanner on your mobile and scan the code on the right to sign in.",
                 "info"
             );
         }
